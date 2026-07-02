@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Löv &amp; Bläck — Redigera</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B1F3B;
+    --parchment:#FFF8EE;
+    --coral:#FF6B5B;
+    --coral-dark:#C23F32;
+    --violet:#7B5EA7;
+    --violet-dark:#4E3A72;
+    --gold:#E8B84B;
+    --gold-dark:#8A6516;
+    --teal:#2FA898;
+    --teal-dark:#1B6A60;
+    --ink-text:#2A2A2A;
+    --muted:#7A7568;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% 10%, rgba(47,168,152,0.12), transparent 40%),
+      radial-gradient(circle at 85% 85%, rgba(232,184,75,0.12), transparent 45%),
+      var(--ink);
+    color:var(--ink-text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+  }
+  h1,h2,h3,.serif{ font-family:'Fraunces', serif; }
+  .meta{ font-family:'Space Mono', monospace; letter-spacing:0.02em; }
+
+  /* Settings gear — always available, independent of lock state */
+  #settings-toggle{
+    position:fixed;
+    top:18px;
+    right:18px;
+    z-index:50;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:500;
+    background:rgba(255,248,238,0.08);
+    border:1.5px solid rgba(255,248,238,0.25);
+    color:rgba(255,248,238,0.85);
+    padding:8px 14px;
+    border-radius:20px;
+    cursor:pointer;
+  }
+  #settings-toggle:hover{ border-color:var(--gold); color:var(--gold); }
+  #settings-panel{
+    display:none;
+    position:fixed;
+    top:60px;
+    right:18px;
+    z-index:50;
+    width:min(360px, calc(100vw - 36px));
+    max-height:calc(100vh - 80px);
+    overflow-y:auto;
+    background:var(--parchment);
+    border-radius:6px;
+    padding:24px 24px 20px;
+    box-shadow:0 20px 45px rgba(0,0,0,0.4);
+  }
+  #settings-panel.open{ display:block; }
+  #settings-panel h2{ font-size:16px; margin:0 0 16px; color:var(--ink); }
+  #settings-panel label{
+    display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--muted); margin-bottom:6px; margin-top:14px;
+  }
+  #settings-panel label:first-of-type{ margin-top:0; }
+  #settings-panel input[type=text], #settings-panel input[type=password]{
+    width:100%; font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px;
+    border:1.5px solid #E4D8C0; border-radius:4px; background:#fff; color:var(--ink); outline:none;
+  }
+  #settings-panel input:focus{ border-color:var(--teal); }
+  .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5; }
+  .settings-save-row{ margin-top:18px; display:flex; justify-content:flex-end; }
+  #settings-status{ font-size:12px; margin-top:10px; min-height:16px; }
+  #settings-status.ok{ color:var(--teal-dark); }
+  #settings-status.error{ color:var(--coral-dark); }
+
+  /* Lock screen */
+  #lock-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .seal-card{
+    width:100%; max-width:420px;
+    background:var(--parchment);
+    border-radius:6px;
+    padding:48px 40px 40px;
+    box-shadow:0 30px 60px rgba(0,0,0,0.35);
+    text-align:center;
+    animation:riseIn .7s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes riseIn{ from{opacity:0; transform:translateY(18px) scale(.98);} to{opacity:1; transform:translateY(0) scale(1);} }
+  .seal{
+    width:76px; height:76px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--teal), var(--teal-dark));
+    margin:0 auto 20px;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--parchment);
+    font-family:'Fraunces', serif; font-size:26px;
+    box-shadow:0 6px 14px rgba(27,106,96,0.4), inset 0 -6px 10px rgba(0,0,0,0.15);
+    transition:transform .5s cubic-bezier(.3,1.4,.5,1), box-shadow .5s ease;
+  }
+  .seal.cracked{
+    transform:scale(1.15) rotate(-8deg);
+    background:radial-gradient(circle at 35% 30%, var(--gold), var(--gold-dark));
+    box-shadow:0 6px 18px rgba(138,101,22,0.45), inset 0 -6px 10px rgba(0,0,0,0.15);
+  }
+  .seal-card h1{ font-size:24px; margin:0 0 6px; color:var(--ink); }
+  .seal-card p.sub{ color:var(--muted); font-size:14px; margin:0 0 28px; }
+  #lock-form{ display:flex; flex-direction:column; gap:14px; }
+  #password-input{
+    font-family:'Space Mono', monospace; font-size:16px; padding:13px 16px;
+    border-radius:4px; border:1.5px solid #E4D8C0; background:#fff; color:var(--ink);
+    text-align:center; letter-spacing:0.08em; outline:none;
+  }
+  #password-input:focus{ border-color:var(--teal); box-shadow:0 0 0 3px rgba(47,168,152,0.15); }
+  #password-input.shake{ animation:shake .4s; border-color:var(--coral-dark); }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 40%{transform:translateX(8px);} 60%{transform:translateX(-5px);} 80%{transform:translateX(5px);} }
+  #unlock-btn{
+    font-family:'Inter',sans-serif; font-weight:600; font-size:15px; padding:13px;
+    border:none; border-radius:4px; background:var(--ink); color:var(--parchment); cursor:pointer;
+  }
+  #unlock-btn:hover{ background:var(--teal-dark); }
+  #unlock-btn:disabled{ opacity:0.6; cursor:default; }
+  #lock-error{ color:var(--coral-dark); font-size:13px; min-height:18px; margin:0; }
+
+  /* App */
+  #app{ display:none; min-height:100vh; }
+  .app-inner{ max-width:760px; margin:0 auto; padding:48px 24px 100px; }
+  header.masthead{
+    margin-bottom:32px; border-bottom:1px solid rgba(255,248,238,0.15); padding-bottom:20px;
+  }
+  header.masthead h1{ color:var(--parchment); font-size:28px; margin:0; }
+  header.masthead .tagline{ color:rgba(255,248,238,0.55); font-size:13px; margin-top:4px; }
+
+  .panel{
+    background:var(--parchment); border-radius:6px; padding:28px 30px;
+    box-shadow:0 14px 30px rgba(0,0,0,0.22); margin-bottom:28px;
+  }
+  .panel label{
+    display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.08em;
+    color:var(--muted); margin-bottom:6px; margin-top:16px;
+  }
+  .panel label:first-of-type{ margin-top:0; }
+
+  #title-input{
+    width:100%; font-family:'Fraunces', serif; font-size:22px; border:none;
+    border-bottom:2px solid #E4D8C0; padding:8px 2px; background:transparent; color:var(--ink); outline:none;
+  }
+  #title-input:focus{ border-bottom-color:var(--teal); }
+  #body-input{
+    width:100%; font-family:'Inter',sans-serif; font-size:15px; line-height:1.7;
+    border:1.5px solid #E4D8C0; border-radius:4px; padding:14px; min-height:200px;
+    resize:vertical; outline:none; color:var(--ink-text); background:#fff;
+  }
+  #body-input:focus{ border-color:var(--teal); }
+  #date-input{
+    font-family:'Space Mono', monospace; font-size:14px; padding:10px 13px;
+    border:1.5px solid #E4D8C0; border-radius:4px; background:#fff; color:var(--ink); outline:none;
+  }
+  .image-drop{
+    border:1.5px dashed #D8CBAE; border-radius:4px; padding:20px; text-align:center;
+    color:var(--muted); font-size:13px; cursor:pointer; background:#FBF3E4;
+  }
+  .image-drop:hover{ border-color:var(--teal); color:var(--teal-dark); }
+  #image-input{ display:none; }
+  #image-previews{ display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; }
+  .image-thumb{ position:relative; }
+  .image-thumb img{ width:90px; height:90px; object-fit:cover; border-radius:4px; box-shadow:0 4px 10px rgba(0,0,0,0.15); }
+  .image-thumb button{
+    position:absolute; top:-7px; right:-7px; width:20px; height:20px; border-radius:50%;
+    border:none; background:var(--coral-dark); color:#fff; font-size:12px; cursor:pointer; line-height:1;
+  }
+  .form-actions{ display:flex; justify-content:flex-end; gap:10px; margin-top:24px; }
+  .btn-ghost{
+    font-family:'Inter',sans-serif; font-size:14px; font-weight:500; background:transparent;
+    border:1.5px solid #D8CBAE; color:var(--ink); padding:10px 18px; border-radius:4px; cursor:pointer;
+  }
+  .btn-ghost:hover{ background:#F2E8D4; }
+  .btn-primary{
+    font-family:'Inter',sans-serif; font-size:14px; font-weight:600; background:var(--ink);
+    color:var(--parchment); border:none; padding:10px 22px; border-radius:4px; cursor:pointer;
+  }
+  .btn-primary:hover{ background:var(--teal-dark); }
+  .btn-primary:disabled{ opacity:0.6; cursor:default; }
+  #status-msg{ font-size:13px; margin-top:14px; min-height:18px; }
+  #status-msg.error{ color:var(--coral-dark); }
+  #status-msg.ok{ color:var(--teal-dark); }
+
+  #posts-manage{ display:flex; flex-direction:column; gap:12px; }
+  .manage-row{
+    display:flex; justify-content:space-between; align-items:center; gap:12px;
+    background:var(--parchment); border-radius:6px; padding:14px 18px;
+    box-shadow:0 6px 16px rgba(0,0,0,0.15);
+  }
+  .manage-row .info{ min-width:0; }
+  .manage-row h3{ font-size:15px; margin:0 0 3px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .manage-row .meta{ font-size:11px; color:var(--muted); }
+  .manage-row .actions{ display:flex; gap:6px; flex-shrink:0; }
+  .icon-btn{
+    background:none; border:1.5px solid #D8CBAE; cursor:pointer; color:var(--ink);
+    font-size:12.5px; font-family:'Inter',sans-serif; padding:6px 12px; border-radius:4px;
+  }
+  .icon-btn:hover{ background:#F2E8D4; }
+  section.block{ margin-bottom:14px; }
+  section.block > h2{ color:var(--parchment); font-size:16px; margin:0 0 14px; }
+</style>
+</head>
+<body>
+
+<button id="settings-toggle">⚙ GitHub-inställningar</button>
+<div class="panel" id="settings-panel">
+  <h2>Anslutning till GitHub</h2>
+  <label for="gh-owner">GitHub-användarnamn</label>
+  <input type="text" id="gh-owner" placeholder="t.ex. anna-blogg">
+  <label for="gh-repo">Repository-namn</label>
+  <input type="text" id="gh-repo" placeholder="t.ex. blogg">
+  <label for="gh-branch">Branch</label>
+  <input type="text" id="gh-branch" placeholder="main" value="main">
+  <label for="gh-token">Personal access token</label>
+  <input type="password" id="gh-token" placeholder="ghp_...">
+  <p class="hint">Token skapas på GitHub under Settings → Developer settings → Fine-grained tokens, med skrivrättighet ("Contents: Read and write") för just det här repot. Den sparas endast i den här webbläsaren och behövs innan du kan låsa upp — annars kan sidan inte hämta eller spara krypterade inlägg.</p>
+  <div class="settings-save-row">
+    <button class="btn-primary" id="save-settings-btn">Spara inställningar</button>
+  </div>
+  <p id="settings-status"></p>
+</div>
+
+<div id="lock-screen">
+  <div class="seal-card">
+    <div class="seal" id="seal">L&amp;B</div>
+    <h1>Redaktionen</h1>
+    <p class="sub">Skriv lösenordet för att skapa och redigera inlägg. Samma lösenord används av läsarsidan för att dekryptera inläggen.</p>
+    <form id="lock-form">
+      <input type="password" id="password-input" placeholder="Lösenord" autocomplete="off">
+      <p id="lock-error"></p>
+      <button type="submit" id="unlock-btn">Lås upp</button>
+    </form>
+  </div>
+</div>
+
+<div id="app">
+  <div class="app-inner">
+    <header class="masthead">
+      <h1>Löv &amp; Bläck — Redaktionen</h1>
+      <p class="tagline meta">skriv och publicera nya inlägg</p>
+    </header>
+
+    <section class="block">
+      <h2>Nytt inlägg</h2>
+      <div class="panel">
+        <label for="title-input">Rubrik</label>
+        <input type="text" id="title-input" placeholder="Ge inlägget en rubrik">
+
+        <label for="date-input">Datum</label>
+        <input type="text" id="date-input" readonly>
+
+        <label for="body-input">Beskrivning / text</label>
+        <textarea id="body-input" placeholder="Skriv vad du har på hjärtat..."></textarea>
+
+        <label>Bilder</label>
+        <div class="image-drop" id="image-drop">Klicka för att välja en eller flera bilder</div>
+        <input type="file" id="image-input" accept="image/*" multiple>
+        <div id="image-previews"></div>
+
+        <div class="form-actions">
+          <button class="btn-ghost" id="cancel-btn">Rensa</button>
+          <button class="btn-primary" id="publish-btn">Publicera</button>
+        </div>
+        <p id="status-msg"></p>
+      </div>
+    </section>
+
+    <section class="block">
+      <h2>Publicerade inlägg</h2>
+      <div id="posts-manage"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+/* ---------- Crypto helpers ----------
+   Same scheme as index.html: the password derives an AES-GCM key via
+   PBKDF2 and is never stored or compared as plaintext. Titles and bodies
+   are encrypted before being written to posts.json; images are uploaded
+   as separate, unencrypted files (see note on ghUploadImage). */
+const PBKDF2_ITERATIONS = 150000;
+const CHECK_PLAINTEXT = 'lov-och-black-ok';
+
+function b64ToBuf(b64){
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf;
+}
+function bufToB64(buf){
+  let bin = '';
+  const bytes = new Uint8Array(buf);
+  for(let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function randomSaltB64(){
+  return bufToB64(crypto.getRandomValues(new Uint8Array(16)));
+}
+async function deriveKey(password, saltB64){
+  const enc = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:PBKDF2_ITERATIONS, hash:'SHA-256' },
+    baseKey,
+    { name:'AES-GCM', length:256 },
+    false,
+    ['encrypt','decrypt']
+  );
+}
+async function encryptText(key, plaintext){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv:iv}, key, new TextEncoder().encode(plaintext));
+  return { iv:bufToB64(iv), ct:bufToB64(ct) };
+}
+async function decryptText(key, field){
+  const pt = await crypto.subtle.decrypt(
+    { name:'AES-GCM', iv:b64ToBuf(field.iv) },
+    key,
+    b64ToBuf(field.ct)
+  );
+  return new TextDecoder().decode(pt);
+}
+
+/* ---------- Settings (GitHub connection) ---------- */
+const SETTINGS_KEY = 'blogg-admin-settings';
+const settingsToggle = document.getElementById('settings-toggle');
+const settingsPanel = document.getElementById('settings-panel');
+const ghOwnerInput = document.getElementById('gh-owner');
+const ghRepoInput = document.getElementById('gh-repo');
+const ghBranchInput = document.getElementById('gh-branch');
+const ghTokenInput = document.getElementById('gh-token');
+const saveSettingsBtn = document.getElementById('save-settings-btn');
+const settingsStatus = document.getElementById('settings-status');
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if(!raw) return null;
+    return JSON.parse(raw);
+  } catch(e){ return null; }
+}
+function getSettings(){
+  return {
+    owner: ghOwnerInput.value.trim(),
+    repo: ghRepoInput.value.trim(),
+    branch: ghBranchInput.value.trim() || 'main',
+    token: ghTokenInput.value.trim()
+  };
+}
+
+(function initSettingsForm(){
+  const s = loadSettings();
+  if(s){
+    ghOwnerInput.value = s.owner || '';
+    ghRepoInput.value = s.repo || '';
+    ghBranchInput.value = s.branch || 'main';
+    ghTokenInput.value = s.token || '';
+  } else {
+    settingsPanel.classList.add('open');
+  }
+})();
+
+settingsToggle.addEventListener('click', function(){
+  settingsPanel.classList.toggle('open');
+});
+
+saveSettingsBtn.addEventListener('click', function(){
+  const s = getSettings();
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  settingsStatus.textContent = 'Inställningar sparade i den här webbläsaren.';
+  settingsStatus.className = 'ok';
+});
+
+/* ---------- GitHub Contents API ---------- */
+function b64EncodeUnicode(str){
+  return btoa(unescape(encodeURIComponent(str)));
+}
+function b64DecodeUnicode(str){
+  return decodeURIComponent(escape(atob(str)));
+}
+
+async function ghFetchRaw(){
+  const s = getSettings();
+  if(!s.owner || !s.repo || !s.token){
+    throw new Error('no-settings');
+  }
+  const url = 'https://api.github.com/repos/' + s.owner + '/' + s.repo + '/contents/posts.json?ref=' + s.branch;
+  const res = await fetch(url, {
+    headers:{ 'Authorization':'token ' + s.token, 'Accept':'application/vnd.github+json' }
+  });
+  if(res.status === 404) return { data:null, sha:null };
+  if(!res.ok) throw new Error('Kunde inte hämta posts.json (' + res.status + ')');
+  const json = await res.json();
+  const content = b64DecodeUnicode(json.content.replace(/\n/g, ''));
+  const data = content.trim() ? JSON.parse(content) : null;
+  return { data:data, sha:json.sha };
+}
+
+async function ghSaveRaw(dataObj, sha, message){
+  const s = getSettings();
+  const url = 'https://api.github.com/repos/' + s.owner + '/' + s.repo + '/contents/posts.json';
+  const body = {
+    message: message || 'Uppdatera inlägg',
+    content: b64EncodeUnicode(JSON.stringify(dataObj, null, 2)),
+    branch: s.branch
+  };
+  if(sha) body.sha = sha;
+  const res = await fetch(url, {
+    method:'PUT',
+    headers:{
+      'Authorization':'token ' + s.token,
+      'Accept':'application/vnd.github+json',
+      'Content-Type':'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  if(!res.ok){
+    const err = await res.json().catch(function(){ return {}; });
+    throw new Error(err.message || ('Kunde inte spara (' + res.status + ')'));
+  }
+  const json = await res.json();
+  return json.content.sha;
+}
+
+/* Images are stored as separate committed files (images/<name>.jpg)
+   rather than inlined as base64 in posts.json — the Contents API rejects
+   payloads over ~1MB, which a handful of inline photos would easily hit.
+   They are not encrypted: doing so would mean fetching+decrypting binary
+   client-side for every <img>, which is a meaningfully bigger change than
+   this pass covers. Only titles/bodies are private for now. */
+async function ghUploadImage(dataUrl, path){
+  const s = getSettings();
+  const base64 = dataUrl.split(',')[1];
+  const url = 'https://api.github.com/repos/' + s.owner + '/' + s.repo + '/contents/' + path;
+  const res = await fetch(url, {
+    method:'PUT',
+    headers:{
+      'Authorization':'token ' + s.token,
+      'Accept':'application/vnd.github+json',
+      'Content-Type':'application/json'
+    },
+    body: JSON.stringify({
+      message: 'Ladda upp bild: ' + path,
+      content: base64,
+      branch: s.branch
+    })
+  });
+  if(!res.ok){
+    const err = await res.json().catch(function(){ return {}; });
+    throw new Error(err.message || ('Kunde inte ladda upp bild (' + res.status + ')'));
+  }
+}
+
+/* ---------- Lock screen ---------- */
+const lockScreen = document.getElementById('lock-screen');
+const app = document.getElementById('app');
+const lockForm = document.getElementById('lock-form');
+const passwordInput = document.getElementById('password-input');
+const lockError = document.getElementById('lock-error');
+const unlockBtn = document.getElementById('unlock-btn');
+const seal = document.getElementById('seal');
+
+let cryptoKey = null;
+let cachedRaw = null;
+let cachedSha = null;
+let cachedPosts = [];
+
+async function attemptUnlock(password){
+  const s = getSettings();
+  if(!s.owner || !s.repo || !s.token){
+    throw new Error('Fyll i GitHub-inställningar (⚙ uppe till höger) innan du låser upp.');
+  }
+  const fetched = await ghFetchRaw();
+  const data = fetched.data;
+
+  if(!data || !data.salt){
+    const salt = randomSaltB64();
+    cryptoKey = await deriveKey(password, salt);
+    cachedRaw = { salt:salt, check:await encryptText(cryptoKey, CHECK_PLAINTEXT), posts:[] };
+    cachedSha = null;
+    return true;
+  }
+
+  const key = await deriveKey(password, data.salt);
+  try{
+    const check = await decryptText(key, data.check);
+    if(check !== CHECK_PLAINTEXT) return false;
+  } catch(err){
+    return false;
+  }
+  cryptoKey = key;
+  cachedRaw = data;
+  cachedSha = fetched.sha;
+  return true;
+}
+
+lockForm.addEventListener('submit', async function(e){
+  e.preventDefault();
+  unlockBtn.disabled = true;
+  try{
+    const ok = await attemptUnlock(passwordInput.value);
+    if(ok){
+      seal.classList.add('cracked');
+      lockError.textContent = '';
+      cachedPosts = await decryptAll(cachedRaw.posts);
+      setTimeout(function(){
+        lockScreen.style.display = 'none';
+        app.style.display = 'block';
+        resetForm();
+        renderManageList();
+      }, 350);
+      return;
+    }
+    showLockError('Fel lösenord. Försök igen.');
+  } catch(err){
+    showLockError(err.message || 'Något gick fel. Försök igen.');
+  } finally {
+    unlockBtn.disabled = false;
+  }
+});
+
+function showLockError(msg){
+  lockError.textContent = msg;
+  passwordInput.classList.remove('shake');
+  void passwordInput.offsetWidth;
+  passwordInput.classList.add('shake');
+  passwordInput.value = '';
+}
+
+async function decryptAll(rawPosts){
+  const out = [];
+  for(const p of rawPosts){
+    try{
+      const title = await decryptText(cryptoKey, p.title);
+      const body = await decryptText(cryptoKey, p.body);
+      out.push({ id:p.id, date:p.date, images:p.images || [], title:title, body:body });
+    } catch(err){
+      /* skip a post that fails to decrypt rather than break the editor */
+    }
+  }
+  return out;
+}
+
+/* ---------- Editor ---------- */
+const titleInput = document.getElementById('title-input');
+const dateInput = document.getElementById('date-input');
+const bodyInput = document.getElementById('body-input');
+const imageDrop = document.getElementById('image-drop');
+const imageInput = document.getElementById('image-input');
+const imagePreviews = document.getElementById('image-previews');
+const cancelBtn = document.getElementById('cancel-btn');
+const publishBtn = document.getElementById('publish-btn');
+const statusMsg = document.getElementById('status-msg');
+const postsManage = document.getElementById('posts-manage');
+
+let currentImages = []; // { dataUrl } for new/unsaved images, { path } for already-uploaded ones
+let editingId = null;
+let currentDate = new Date().toISOString();
+
+function resetForm(){
+  editingId = null;
+  titleInput.value = '';
+  bodyInput.value = '';
+  currentImages = [];
+  currentDate = new Date().toISOString();
+  dateInput.value = new Date(currentDate).toLocaleDateString('sv-SE', {year:'numeric', month:'long', day:'numeric'});
+  renderImagePreviews();
+  setStatus('', '');
+}
+
+cancelBtn.addEventListener('click', resetForm);
+
+imageDrop.addEventListener('click', function(){ imageInput.click(); });
+
+imageInput.addEventListener('change', function(){
+  const files = Array.from(imageInput.files || []);
+  files.forEach(function(file){ processImageFile(file); });
+  imageInput.value = '';
+});
+
+function processImageFile(file){
+  const reader = new FileReader();
+  reader.onload = function(){
+    const img = new Image();
+    img.onload = function(){
+      const maxWidth = 1200;
+      let w = img.width, h = img.height;
+      if(w > maxWidth){
+        h = Math.round(h * (maxWidth / w));
+        w = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      currentImages.push({ dataUrl:dataUrl });
+      renderImagePreviews();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderImagePreviews(){
+  imagePreviews.innerHTML = '';
+  currentImages.forEach(function(img, idx){
+    const src = img.dataUrl || img.path;
+    const div = document.createElement('div');
+    div.className = 'image-thumb';
+    div.innerHTML = '<img src="' + escapeHtml(src) + '"><button data-idx="' + idx + '">×</button>';
+    imagePreviews.appendChild(div);
+  });
+}
+
+imagePreviews.addEventListener('click', function(e){
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  currentImages.splice(parseInt(btn.dataset.idx), 1);
+  renderImagePreviews();
+});
+
+function setStatus(msg, kind){
+  statusMsg.textContent = msg;
+  statusMsg.className = kind || '';
+}
+
+async function uploadPendingImages(list){
+  const out = [];
+  for(let i = 0; i < list.length; i++){
+    const item = list[i];
+    if(item.path){
+      out.push(item.path);
+      continue;
+    }
+    const path = 'images/' + Date.now() + '-' + i + '.jpg';
+    await ghUploadImage(item.dataUrl, path);
+    out.push(path);
+  }
+  return out;
+}
+
+publishBtn.addEventListener('click', async function(){
+  const title = titleInput.value.trim();
+  const body = bodyInput.value.trim();
+  if(!title || !body){
+    setStatus('Skriv både en rubrik och en text innan du publicerar.', 'error');
+    return;
+  }
+  publishBtn.disabled = true;
+  setStatus('Publicerar...', '');
+  try{
+    const imagePaths = await uploadPendingImages(currentImages);
+    const titleEnc = await encryptText(cryptoKey, title);
+    const bodyEnc = await encryptText(cryptoKey, body);
+
+    let rawPosts = cachedRaw.posts.slice();
+    if(editingId){
+      const idx = rawPosts.findIndex(function(p){ return p.id === editingId; });
+      if(idx > -1){
+        rawPosts[idx] = { id:editingId, date:currentDate, images:imagePaths, title:titleEnc, body:bodyEnc };
+      }
+    } else {
+      rawPosts.unshift({
+        id: 'p_' + Date.now(),
+        date: currentDate,
+        images: imagePaths,
+        title: titleEnc,
+        body: bodyEnc
+      });
+    }
+
+    const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, posts:rawPosts };
+    const message = editingId ? ('Uppdatera inlägg: ' + title) : ('Nytt inlägg: ' + title);
+    cachedSha = await ghSaveRaw(nextRaw, cachedSha, message);
+    cachedRaw = nextRaw;
+    cachedPosts = await decryptAll(rawPosts);
+
+    setStatus('Publicerat! Det kan ta någon minut innan sidan uppdateras.', 'ok');
+    resetForm();
+    renderManageList();
+  } catch(err){
+    setStatus(err.message, 'error');
+  } finally {
+    publishBtn.disabled = false;
+  }
+});
+
+function renderManageList(){
+  postsManage.innerHTML = '';
+  if(cachedPosts.length === 0){
+    postsManage.innerHTML = '<p class="hint" style="color:rgba(255,248,238,0.6)">Inga inlägg publicerade ännu.</p>';
+    return;
+  }
+  const sorted = cachedPosts.slice().sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+  sorted.forEach(function(post){
+    const row = document.createElement('div');
+    row.className = 'manage-row';
+    row.innerHTML =
+      '<div class="info">' +
+        '<h3>' + escapeHtml(post.title) + '</h3>' +
+        '<div class="meta">' + new Date(post.date).toLocaleDateString('sv-SE', {year:'numeric', month:'long', day:'numeric'}) + '</div>' +
+      '</div>' +
+      '<div class="actions">' +
+        '<button class="icon-btn" data-action="edit" data-id="' + post.id + '">Redigera</button>' +
+        '<button class="icon-btn" data-action="delete" data-id="' + post.id + '">Ta bort</button>' +
+      '</div>';
+    postsManage.appendChild(row);
+  });
+}
+
+postsManage.addEventListener('click', async function(e){
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  const action = btn.dataset.action;
+  const post = cachedPosts.find(function(p){ return p.id === id; });
+  if(!post) return;
+
+  if(action === 'edit'){
+    editingId = post.id;
+    titleInput.value = post.title;
+    bodyInput.value = post.body;
+    currentImages = (post.images || []).map(function(path){ return { path:path }; });
+    currentDate = post.date;
+    dateInput.value = new Date(currentDate).toLocaleDateString('sv-SE', {year:'numeric', month:'long', day:'numeric'});
+    renderImagePreviews();
+    setStatus('Redigerar "' + post.title + '". Publicera för att spara ändringen.', '');
+    window.scrollTo({top:0, behavior:'smooth'});
+  } else if(action === 'delete'){
+    if(!confirm('Ta bort inlägget "' + post.title + '"?')) return;
+    btn.disabled = true;
+    try{
+      const rawPosts = cachedRaw.posts.filter(function(p){ return p.id !== id; });
+      const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, posts:rawPosts };
+      cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Ta bort inlägg: ' + post.title);
+      cachedRaw = nextRaw;
+      cachedPosts = cachedPosts.filter(function(p){ return p.id !== id; });
+      renderManageList();
+    } catch(err){
+      alert('Kunde inte ta bort: ' + err.message);
+      btn.disabled = false;
+    }
+  }
+});
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>

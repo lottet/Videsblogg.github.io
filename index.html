@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -11,9 +10,7 @@
 <style>
   :root{
     --ink:#1B1F3B;
-    --ink-2:#262C52;
     --parchment:#FFF8EE;
-    --parchment-2:#FBF0DC;
     --coral:#FF6B5B;
     --coral-dark:#C23F32;
     --violet:#7B5EA7;
@@ -53,10 +50,8 @@
     background:var(--parchment);
     border-radius:6px;
     padding:48px 40px 40px;
-    position:relative;
     box-shadow:0 30px 60px rgba(0,0,0,0.35);
     text-align:center;
-    transform-origin:center;
     animation:riseIn .7s cubic-bezier(.2,.8,.2,1) both;
   }
   @keyframes riseIn{
@@ -80,16 +75,8 @@
     background:radial-gradient(circle at 35% 30%, var(--teal), var(--teal-dark));
     box-shadow:0 6px 18px rgba(27,106,96,0.45), inset 0 -6px 10px rgba(0,0,0,0.15);
   }
-  .seal-card h1{
-    font-size:26px;
-    margin:0 0 6px;
-    color:var(--ink);
-  }
-  .seal-card p.sub{
-    color:var(--muted);
-    font-size:14px;
-    margin:0 0 28px;
-  }
+  .seal-card h1{ font-size:26px; margin:0 0 6px; color:var(--ink); }
+  .seal-card p.sub{ color:var(--muted); font-size:14px; margin:0 0 28px; }
   #lock-form{ display:flex; flex-direction:column; gap:14px; }
   #password-input{
     font-family:'Space Mono', monospace;
@@ -104,14 +91,8 @@
     outline:none;
     transition:border-color .2s, box-shadow .2s;
   }
-  #password-input:focus{
-    border-color:var(--violet);
-    box-shadow:0 0 0 3px rgba(123,94,167,0.15);
-  }
-  #password-input.shake{
-    animation:shake .4s;
-    border-color:var(--coral-dark);
-  }
+  #password-input:focus{ border-color:var(--violet); box-shadow:0 0 0 3px rgba(123,94,167,0.15); }
+  #password-input.shake{ animation:shake .4s; border-color:var(--coral-dark); }
   @keyframes shake{
     0%,100%{transform:translateX(0);}
     20%{transform:translateX(-8px);}
@@ -133,220 +114,130 @@
   }
   #unlock-btn:hover{ background:var(--violet-dark); }
   #unlock-btn:active{ transform:scale(0.98); }
-  #lock-error{
-    color:var(--coral-dark);
-    font-size:13px;
-    min-height:18px;
-    margin:0;
-  }
+  #unlock-btn:disabled{ opacity:0.6; cursor:default; }
+  #lock-error{ color:var(--coral-dark); font-size:13px; min-height:18px; margin:0; }
 
-  /* ---------- App ---------- */
+  /* ---------- App layout ---------- */
   #app{ display:none; min-height:100vh; }
-  .app-inner{
-    max-width:880px;
+  .layout{
+    max-width:1100px;
     margin:0 auto;
-    padding:56px 24px 100px;
+    padding:48px 24px 100px;
+    display:grid;
+    grid-template-columns:230px 1fr;
+    gap:44px;
   }
   header.masthead{
-    display:flex;
-    align-items:flex-end;
-    justify-content:space-between;
-    margin-bottom:44px;
+    grid-column:1 / -1;
+    margin-bottom:8px;
     border-bottom:1px solid rgba(255,248,238,0.15);
     padding-bottom:24px;
   }
-  header.masthead h1{
-    color:var(--parchment);
-    font-size:34px;
-    margin:0;
-  }
-  header.masthead .tagline{
-    color:rgba(255,248,238,0.55);
-    font-size:13px;
-    margin-top:6px;
-  }
-  #new-post-btn{
-    font-family:'Inter',sans-serif;
-    font-weight:600;
-    font-size:14px;
-    background:var(--coral);
-    color:#3A0E07;
-    border:none;
-    padding:12px 20px;
-    border-radius:4px;
-    cursor:pointer;
-    white-space:nowrap;
-    transition:background .2s, transform .1s;
-  }
-  #new-post-btn:hover{ background:#ff8073; }
-  #new-post-btn:active{ transform:scale(0.97); }
+  header.masthead h1{ color:var(--parchment); font-size:34px; margin:0; }
+  header.masthead .tagline{ color:rgba(255,248,238,0.55); font-size:13px; margin-top:6px; }
 
-  /* Editor */
-  #editor{
-    background:var(--parchment);
-    border-radius:6px;
-    padding:32px;
-    margin-bottom:40px;
-    display:none;
-    box-shadow:0 20px 40px rgba(0,0,0,0.28);
-  }
-  #editor.open{ display:block; animation:riseIn .35s ease both; }
-  #editor label{
-    display:block;
+  /* Sidebar */
+  aside.archive{ position:sticky; top:32px; align-self:start; }
+  .archive h3{
+    color:rgba(255,248,238,0.55);
     font-size:12px;
     text-transform:uppercase;
-    letter-spacing:0.08em;
-    color:var(--muted);
-    margin-bottom:6px;
-    margin-top:18px;
+    letter-spacing:0.1em;
+    margin:0 0 14px;
+    font-family:'Inter',sans-serif;
+    font-weight:600;
   }
-  #editor label:first-of-type{ margin-top:0; }
-  #title-input{
+  .archive-all{
+    display:block;
     width:100%;
-    font-family:'Fraunces', serif;
-    font-size:24px;
+    text-align:left;
+    background:none;
     border:none;
-    border-bottom:2px solid #E4D8C0;
-    padding:8px 2px;
-    background:transparent;
-    color:var(--ink);
-    outline:none;
-  }
-  #title-input:focus{ border-bottom-color:var(--violet); }
-  #body-input{
-    width:100%;
-    font-family:'Inter',sans-serif;
-    font-size:15px;
-    line-height:1.7;
-    border:1.5px solid #E4D8C0;
-    border-radius:4px;
-    padding:14px;
-    min-height:220px;
-    resize:vertical;
-    outline:none;
-    color:var(--ink-text);
-    background:#fff;
-  }
-  #body-input:focus{ border-color:var(--violet); }
-  .tag-row{ display:flex; gap:10px; flex-wrap:wrap; }
-  .tag-choice{
-    padding:7px 14px;
-    border-radius:20px;
-    font-size:13px;
-    font-weight:600;
-    cursor:pointer;
-    border:1.5px solid transparent;
-    opacity:0.55;
-    transition:opacity .15s, transform .1s;
-  }
-  .tag-choice:hover{ opacity:0.85; }
-  .tag-choice.selected{ opacity:1; border-color:rgba(0,0,0,0.15); transform:scale(1.03); }
-  .tag-Tankar{ background:#EEEBFA; color:var(--violet-dark); }
-  .tag-Resor{ background:#FDEDE9; color:var(--coral-dark); }
-  .tag-Kod{ background:#E4F5F1; color:var(--teal-dark); }
-  .tag-Vardag{ background:#FBF0D9; color:var(--gold-dark); }
-  .editor-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap:10px;
-    margin-top:26px;
-  }
-  .btn-ghost{
-    font-family:'Inter',sans-serif;
-    font-size:14px;
-    font-weight:500;
-    background:transparent;
-    border:1.5px solid #D8CBAE;
-    color:var(--ink);
-    padding:10px 18px;
-    border-radius:4px;
-    cursor:pointer;
-  }
-  .btn-ghost:hover{ background:#F2E8D4; }
-  .btn-primary{
-    font-family:'Inter',sans-serif;
-    font-size:14px;
-    font-weight:600;
-    background:var(--ink);
     color:var(--parchment);
-    border:none;
-    padding:10px 20px;
-    border-radius:4px;
+    font-family:'Fraunces', serif;
+    font-size:16px;
+    padding:6px 0;
     cursor:pointer;
+    margin-bottom:10px;
+    opacity:0.85;
   }
-  .btn-primary:hover{ background:var(--violet-dark); }
+  .archive-all.active{ color:var(--gold); opacity:1; }
+  .year-block{ margin-bottom:6px; }
+  .year-btn{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    width:100%;
+    background:none;
+    border:none;
+    color:var(--parchment);
+    font-family:'Fraunces', serif;
+    font-size:17px;
+    padding:8px 0;
+    cursor:pointer;
+    opacity:0.9;
+  }
+  .year-btn .count{ font-family:'Space Mono', monospace; font-size:11px; color:rgba(255,248,238,0.45); }
+  .month-list{
+    list-style:none;
+    margin:0 0 6px;
+    padding:0 0 0 4px;
+    display:none;
+    border-left:2px solid rgba(255,248,238,0.15);
+  }
+  .month-list.open{ display:block; }
+  .month-btn{
+    display:flex;
+    justify-content:space-between;
+    width:100%;
+    background:none;
+    border:none;
+    color:rgba(255,248,238,0.7);
+    font-family:'Inter',sans-serif;
+    font-size:13.5px;
+    padding:7px 0 7px 14px;
+    cursor:pointer;
+    text-transform:capitalize;
+  }
+  .month-btn:hover{ color:var(--parchment); }
+  .month-btn.active{ color:var(--gold); font-weight:600; }
+  .month-btn .count{ font-family:'Space Mono', monospace; font-size:11px; color:rgba(255,248,238,0.4); }
 
   /* Posts */
-  #posts-list{ display:flex; flex-direction:column; gap:18px; }
+  main{ min-width:0; }
+  #filter-label{ color:rgba(255,248,238,0.55); font-size:13px; margin:0 0 20px; }
+  #posts-list{ display:flex; flex-direction:column; gap:22px; }
   .post-card{
     background:var(--parchment);
     border-radius:6px;
-    padding:24px 26px;
+    padding:28px 30px;
     box-shadow:0 10px 24px rgba(0,0,0,0.18);
     border-left:6px solid var(--violet);
-    position:relative;
   }
-  .post-card[data-tag="Tankar"]{ border-left-color:var(--violet); }
-  .post-card[data-tag="Resor"]{ border-left-color:var(--coral); }
-  .post-card[data-tag="Kod"]{ border-left-color:var(--teal); }
-  .post-card[data-tag="Vardag"]{ border-left-color:var(--gold); }
-  .post-top{
-    display:flex;
-    justify-content:space-between;
-    align-items:flex-start;
-    gap:12px;
-  }
-  .post-card h2{
-    font-size:21px;
-    margin:0 0 8px;
-    color:var(--ink);
-  }
-  .post-meta{
-    font-size:11.5px;
-    color:var(--muted);
-    display:flex;
-    align-items:center;
-    gap:10px;
-    margin-bottom:10px;
-  }
-  .post-meta .tag-pill{
-    padding:3px 10px;
-    border-radius:12px;
-    font-family:'Inter',sans-serif;
-    font-weight:600;
-    font-size:11px;
-  }
+  .post-meta{ font-size:11.5px; color:var(--muted); margin-bottom:8px; }
+  .post-card h2{ font-size:22px; margin:0 0 12px; color:var(--ink); }
   .post-body{
     font-size:15px;
     line-height:1.75;
     color:var(--ink-text);
     white-space:pre-wrap;
+    margin-bottom:14px;
   }
-  .post-actions{
-    display:flex; gap:8px; flex-shrink:0;
-  }
-  .icon-btn{
-    background:none;
-    border:none;
-    cursor:pointer;
-    color:var(--muted);
-    font-size:13px;
-    font-family:'Inter',sans-serif;
-    padding:4px 8px;
+  .post-images{ display:flex; flex-wrap:wrap; gap:10px; }
+  .post-images img{
+    max-width:220px;
+    max-height:220px;
+    object-fit:cover;
     border-radius:4px;
+    box-shadow:0 4px 10px rgba(0,0,0,0.15);
   }
-  .icon-btn:hover{ background:#F2E8D4; color:var(--ink); }
-  #empty-state{
-    text-align:center;
-    padding:60px 20px;
-    color:rgba(255,248,238,0.5);
-  }
+  #empty-state{ text-align:center; padding:60px 20px; color:rgba(255,248,238,0.5); }
   #empty-state h3{ color:rgba(255,248,238,0.8); font-size:20px; margin-bottom:8px; }
   #empty-state p{ font-size:14px; }
 
-  @media (max-width:600px){
-    header.masthead{ flex-direction:column; align-items:flex-start; gap:16px; }
-    #new-post-btn{ width:100%; }
+  @media (max-width:760px){
+    .layout{ grid-template-columns:1fr; }
+    aside.archive{ position:static; }
   }
 </style>
 </head>
@@ -366,238 +257,284 @@
 </div>
 
 <div id="app">
-  <div class="app-inner">
+  <div class="layout">
     <header class="masthead">
-      <div>
-        <h1>Löv &amp; Bläck</h1>
-        <p class="tagline meta">en samling anteckningar, tankar och resor</p>
-      </div>
-      <button id="new-post-btn">+ Nytt inlägg</button>
+      <h1>Löv &amp; Bläck</h1>
+      <p class="tagline meta">en samling anteckningar, tankar och resor</p>
     </header>
 
-    <div id="editor">
-      <label for="title-input">Rubrik</label>
-      <input type="text" id="title-input" placeholder="Ge inlägget en rubrik">
+    <aside class="archive">
+      <h3>Arkiv</h3>
+      <button class="archive-all active" id="show-all">Alla inlägg</button>
+      <div id="year-list"></div>
+    </aside>
 
-      <label>Kategori</label>
-      <div class="tag-row" id="tag-row">
-        <div class="tag-choice tag-Tankar" data-tag="Tankar">Tankar</div>
-        <div class="tag-choice tag-Resor" data-tag="Resor">Resor</div>
-        <div class="tag-choice tag-Kod" data-tag="Kod">Kod</div>
-        <div class="tag-choice tag-Vardag" data-tag="Vardag">Vardag</div>
+    <main>
+      <p id="filter-label"></p>
+      <div id="posts-list"></div>
+      <div id="empty-state" style="display:none;">
+        <h3>Inga inlägg ännu</h3>
+        <p>Nya inlägg dyker upp här så fort de publiceras.</p>
       </div>
-
-      <label for="body-input">Text</label>
-      <textarea id="body-input" placeholder="Skriv vad du har på hjärtat..."></textarea>
-
-      <div class="editor-actions">
-        <button class="btn-ghost" id="cancel-btn">Avbryt</button>
-        <button class="btn-primary" id="save-btn">Publicera</button>
-      </div>
-    </div>
-
-    <div id="posts-list"></div>
-    <div id="empty-state" style="display:none;">
-      <h3>Inga inlägg ännu</h3>
-      <p>Tryck på "Nytt inlägg" för att skriva ditt första.</p>
-    </div>
+    </main>
   </div>
 </div>
 
 <script>
-const CORRECT_PASSWORD = "Edgar";
-const STORAGE_KEY = "blogg:inlagg";
+/* ---------- Crypto helpers ----------
+   Posts are stored encrypted in posts.json. The site password is never
+   compared as a string: it's used to derive an AES key via PBKDF2, and
+   that key either successfully decrypts the stored "check" value or it
+   doesn't. This means posts.json is safe to publish in a public repo —
+   fetching it directly only yields salt/IV/ciphertext, never plaintext. */
+const PBKDF2_ITERATIONS = 150000;
+const CHECK_PLAINTEXT = 'lov-och-black-ok';
+
+function b64ToBuf(b64){
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf;
+}
+function bufToB64(buf){
+  let bin = '';
+  const bytes = new Uint8Array(buf);
+  for(let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+async function deriveKey(password, saltB64){
+  const enc = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:PBKDF2_ITERATIONS, hash:'SHA-256' },
+    baseKey,
+    { name:'AES-GCM', length:256 },
+    false,
+    ['decrypt']
+  );
+}
+async function decryptText(key, field){
+  const pt = await crypto.subtle.decrypt(
+    { name:'AES-GCM', iv:b64ToBuf(field.iv) },
+    key,
+    b64ToBuf(field.ct)
+  );
+  return new TextDecoder().decode(pt);
+}
 
 const lockScreen = document.getElementById('lock-screen');
 const app = document.getElementById('app');
 const lockForm = document.getElementById('lock-form');
 const passwordInput = document.getElementById('password-input');
 const lockError = document.getElementById('lock-error');
+const unlockBtn = document.getElementById('unlock-btn');
 const seal = document.getElementById('seal');
 
-lockForm.addEventListener('submit', function(e){
+let cryptoKey = null;
+let rawData = null;
+
+async function attemptUnlock(password){
+  let data = null;
+  const res = await fetch('./posts.json', {cache:'no-store'});
+  if(res.ok){
+    data = await res.json();
+  } else if(res.status !== 404){
+    throw new Error('Kunde inte hämta inlägg (' + res.status + ').');
+  }
+
+  if(!data || !data.salt){
+    cryptoKey = null;
+    rawData = { posts:[] };
+    return true;
+  }
+
+  const key = await deriveKey(password, data.salt);
+  try{
+    const check = await decryptText(key, data.check);
+    if(check !== CHECK_PLAINTEXT) return false;
+  } catch(err){
+    return false;
+  }
+  cryptoKey = key;
+  rawData = data;
+  return true;
+}
+
+lockForm.addEventListener('submit', async function(e){
   e.preventDefault();
-  if(passwordInput.value === CORRECT_PASSWORD){
-    seal.classList.add('cracked');
-    lockError.textContent = '';
-    setTimeout(function(){
-      lockScreen.style.display = 'none';
-      app.style.display = 'block';
-      loadPosts();
-    }, 350);
-  } else {
-    lockError.textContent = 'Fel lösenord. Försök igen.';
-    passwordInput.classList.remove('shake');
-    void passwordInput.offsetWidth;
-    passwordInput.classList.add('shake');
-    passwordInput.value = '';
-  }
-});
-
-const editor = document.getElementById('editor');
-const newPostBtn = document.getElementById('new-post-btn');
-const cancelBtn = document.getElementById('cancel-btn');
-const saveBtn = document.getElementById('save-btn');
-const titleInput = document.getElementById('title-input');
-const bodyInput = document.getElementById('body-input');
-const tagRow = document.getElementById('tag-row');
-const postsList = document.getElementById('posts-list');
-const emptyState = document.getElementById('empty-state');
-
-let selectedTag = 'Tankar';
-let editingId = null;
-let posts = [];
-
-tagRow.addEventListener('click', function(e){
-  const choice = e.target.closest('.tag-choice');
-  if(!choice) return;
-  document.querySelectorAll('.tag-choice').forEach(function(el){ el.classList.remove('selected'); });
-  choice.classList.add('selected');
-  selectedTag = choice.dataset.tag;
-});
-
-function openEditor(post){
-  editor.classList.add('open');
-  if(post){
-    editingId = post.id;
-    titleInput.value = post.title;
-    bodyInput.value = post.body;
-    selectedTag = post.tag;
-  } else {
-    editingId = null;
-    titleInput.value = '';
-    bodyInput.value = '';
-    selectedTag = 'Tankar';
-  }
-  document.querySelectorAll('.tag-choice').forEach(function(el){
-    el.classList.toggle('selected', el.dataset.tag === selectedTag);
-  });
-  titleInput.focus();
-  editor.scrollIntoView({behavior:'smooth', block:'start'});
-}
-
-function closeEditor(){
-  editor.classList.remove('open');
-  editingId = null;
-}
-
-newPostBtn.addEventListener('click', function(){ openEditor(null); });
-cancelBtn.addEventListener('click', closeEditor);
-
-saveBtn.addEventListener('click', async function(){
-  const title = titleInput.value.trim();
-  const body = bodyInput.value.trim();
-  if(!title || !body){
-    alert('Skriv både en rubrik och en text innan du publicerar.');
-    return;
-  }
-  if(editingId){
-    const idx = posts.findIndex(function(p){ return p.id === editingId; });
-    if(idx > -1){
-      posts[idx].title = title;
-      posts[idx].body = body;
-      posts[idx].tag = selectedTag;
+  unlockBtn.disabled = true;
+  try{
+    const ok = await attemptUnlock(passwordInput.value);
+    if(ok){
+      seal.classList.add('cracked');
+      lockError.textContent = '';
+      setTimeout(function(){
+        lockScreen.style.display = 'none';
+        app.style.display = 'block';
+        loadPosts();
+      }, 350);
+      return;
     }
-  } else {
-    posts.unshift({
-      id: 'p_' + Date.now(),
-      title: title,
-      body: body,
-      tag: selectedTag,
-      date: new Date().toISOString()
-    });
+    showLockError('Fel lösenord. Försök igen.');
+  } catch(err){
+    showLockError(err.message || 'Något gick fel. Försök igen.');
+  } finally {
+    unlockBtn.disabled = false;
   }
-  await persistPosts();
-  closeEditor();
-  renderPosts();
 });
+
+function showLockError(msg){
+  lockError.textContent = msg;
+  passwordInput.classList.remove('shake');
+  void passwordInput.offsetWidth;
+  passwordInput.classList.add('shake');
+  passwordInput.value = '';
+}
+
+const yearListEl = document.getElementById('year-list');
+const showAllBtn = document.getElementById('show-all');
+const postsListEl = document.getElementById('posts-list');
+const emptyStateEl = document.getElementById('empty-state');
+const filterLabelEl = document.getElementById('filter-label');
+
+let allPosts = [];
+let activeFilter = null;
+
+const MONTHS_SV = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
 
 async function loadPosts(){
-  try{
-    const result = await window.storage.get(STORAGE_KEY, false);
-    posts = result && result.value ? JSON.parse(result.value) : [];
-  } catch(err){
-    posts = [];
+  const decrypted = [];
+  if(cryptoKey && rawData && rawData.posts){
+    for(const p of rawData.posts){
+      try{
+        const title = await decryptText(cryptoKey, p.title);
+        const body = await decryptText(cryptoKey, p.body);
+        decrypted.push({ id:p.id, date:p.date, images:p.images || [], title:title, body:body });
+      } catch(err){
+        /* skip a post that fails to decrypt rather than break the whole page */
+      }
+    }
   }
+  allPosts = decrypted;
+  allPosts.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+  buildArchive();
   renderPosts();
 }
 
-async function persistPosts(){
-  try{
-    await window.storage.set(STORAGE_KEY, JSON.stringify(posts), false);
-  } catch(err){
-    console.error('Kunde inte spara inlägg', err);
+function buildArchive(){
+  const tree = {};
+  allPosts.forEach(function(post){
+    const d = new Date(post.date);
+    const y = d.getFullYear();
+    const m = d.getMonth();
+    if(!tree[y]) tree[y] = {};
+    if(!tree[y][m]) tree[y][m] = 0;
+    tree[y][m]++;
+  });
+  const years = Object.keys(tree).sort(function(a,b){ return b - a; });
+  yearListEl.innerHTML = '';
+  years.forEach(function(year){
+    const yearBlock = document.createElement('div');
+    yearBlock.className = 'year-block';
+
+    const yearCount = Object.values(tree[year]).reduce(function(a,b){ return a+b; }, 0);
+    const yearBtn = document.createElement('button');
+    yearBtn.className = 'year-btn';
+    yearBtn.innerHTML = '<span>' + year + '</span><span class="count">' + yearCount + '</span>';
+
+    const monthList = document.createElement('ul');
+    monthList.className = 'month-list';
+
+    const months = Object.keys(tree[year]).sort(function(a,b){ return b - a; });
+    months.forEach(function(m){
+      const li = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.className = 'month-btn';
+      btn.dataset.year = year;
+      btn.dataset.month = m;
+      btn.innerHTML = '<span>' + MONTHS_SV[m] + '</span><span class="count">' + tree[year][m] + '</span>';
+      btn.addEventListener('click', function(){
+        activeFilter = {year: parseInt(year), month: parseInt(m)};
+        document.querySelectorAll('.month-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        showAllBtn.classList.remove('active');
+        renderPosts();
+      });
+      li.appendChild(btn);
+      monthList.appendChild(li);
+    });
+
+    yearBtn.addEventListener('click', function(){
+      monthList.classList.toggle('open');
+    });
+
+    yearBlock.appendChild(yearBtn);
+    yearBlock.appendChild(monthList);
+    yearListEl.appendChild(yearBlock);
+  });
+
+  if(years.length > 0){
+    yearListEl.querySelector('.month-list').classList.add('open');
   }
 }
+
+showAllBtn.addEventListener('click', function(){
+  activeFilter = null;
+  document.querySelectorAll('.month-btn').forEach(function(b){ b.classList.remove('active'); });
+  showAllBtn.classList.add('active');
+  renderPosts();
+});
 
 function formatDate(iso){
   const d = new Date(iso);
   return d.toLocaleDateString('sv-SE', { year:'numeric', month:'long', day:'numeric' });
 }
 
-const tagPillColors = {
-  'Tankar': {bg:'#EEEBFA', fg:'#4E3A72'},
-  'Resor': {bg:'#FDEDE9', fg:'#C23F32'},
-  'Kod': {bg:'#E4F5F1', fg:'#1B6A60'},
-  'Vardag': {bg:'#FBF0D9', fg:'#8A6516'}
-};
-
 function renderPosts(){
-  postsList.innerHTML = '';
+  let posts = allPosts;
+  if(activeFilter){
+    posts = allPosts.filter(function(p){
+      const d = new Date(p.date);
+      return d.getFullYear() === activeFilter.year && d.getMonth() === activeFilter.month;
+    });
+    filterLabelEl.textContent = 'Visar inlägg från ' + MONTHS_SV[activeFilter.month] + ' ' + activeFilter.year;
+  } else {
+    filterLabelEl.textContent = 'Visar alla inlägg';
+  }
+
+  postsListEl.innerHTML = '';
   if(posts.length === 0){
-    emptyState.style.display = 'block';
+    emptyStateEl.style.display = 'block';
     return;
   }
-  emptyState.style.display = 'none';
+  emptyStateEl.style.display = 'none';
+
   posts.forEach(function(post){
     const card = document.createElement('div');
     card.className = 'post-card';
-    card.dataset.tag = post.tag;
 
-    const colors = tagPillColors[post.tag] || tagPillColors['Tankar'];
+    let imagesHtml = '';
+    if(post.images && post.images.length){
+      imagesHtml = '<div class="post-images">' + post.images.map(function(src){
+        return '<img src="' + escapeHtml(src) + '" alt="">';
+      }).join('') + '</div>';
+    }
 
     card.innerHTML =
-      '<div class="post-top">' +
-        '<div>' +
-          '<div class="post-meta">' +
-            '<span class="tag-pill" style="background:' + colors.bg + ';color:' + colors.fg + ';">' + post.tag + '</span>' +
-            '<span class="meta">' + formatDate(post.date) + '</span>' +
-          '</div>' +
-          '<h2>' + escapeHtml(post.title) + '</h2>' +
-        '</div>' +
-        '<div class="post-actions">' +
-          '<button class="icon-btn" data-action="edit" data-id="' + post.id + '">Redigera</button>' +
-          '<button class="icon-btn" data-action="delete" data-id="' + post.id + '">Ta bort</button>' +
-        '</div>' +
-      '</div>' +
-      '<div class="post-body">' + escapeHtml(post.body) + '</div>';
+      '<div class="post-meta meta">' + formatDate(post.date) + '</div>' +
+      '<h2>' + escapeHtml(post.title) + '</h2>' +
+      '<div class="post-body">' + escapeHtml(post.body) + '</div>' +
+      imagesHtml;
 
-    postsList.appendChild(card);
+    postsListEl.appendChild(card);
   });
 }
 
 function escapeHtml(str){
   const div = document.createElement('div');
-  div.textContent = str;
+  div.textContent = str || '';
   return div.innerHTML;
 }
-
-postsList.addEventListener('click', async function(e){
-  const btn = e.target.closest('.icon-btn');
-  if(!btn) return;
-  const id = btn.dataset.id;
-  const action = btn.dataset.action;
-  if(action === 'edit'){
-    const post = posts.find(function(p){ return p.id === id; });
-    if(post) openEditor(post);
-  } else if(action === 'delete'){
-    if(confirm('Ta bort det här inlägget?')){
-      posts = posts.filter(function(p){ return p.id !== id; });
-      await persistPosts();
-      renderPosts();
-    }
-  }
-});
 </script>
 </body>
 </html>
