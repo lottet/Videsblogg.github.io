@@ -32,5 +32,12 @@
         "ct": "/2ce7vpGXJQYTMjL4irrPaCI"
       }
     }
-  ]
+  ],
+  "commentAuth": {
+    "salt": "H/dFtkPorGsZfIa3RSKJvQ==",
+    "check": {
+      "iv": "56J0OYXSMS3E4LHy",
+      "ct": "4hguYK9pOiFNF2BP6bIs/EJ2VMYmrxkClgIKWXb7Nnw="
+    }
+  }
 }
