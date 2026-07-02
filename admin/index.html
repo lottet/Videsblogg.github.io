@@ -307,6 +307,11 @@
    never change once real posts exist — it's what the stored "check" field
    is validated against on every unlock. */
 const PBKDF2_ITERATIONS = 150000;
+/* Cloudflare Workers cap PBKDF2 at 100,000 iterations, so comment
+   verification/encryption uses its own key (commentAuth field) derived
+   at this lower count — kept fully separate from the main 150k scheme
+   so existing post content never needs to be re-encrypted. */
+const COMMENTS_PBKDF2_ITERATIONS = 100000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
 
@@ -325,11 +330,11 @@ function bufToB64(buf){
 function randomSaltB64(){
   return bufToB64(crypto.getRandomValues(new Uint8Array(16)));
 }
-async function deriveKey(password, saltB64){
+async function deriveKey(password, saltB64, iterations){
   const enc = new TextEncoder();
   const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:PBKDF2_ITERATIONS, hash:'SHA-256' },
+    { name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:iterations, hash:'SHA-256' },
     baseKey,
     { name:'AES-GCM', length:256 },
     false,
@@ -504,13 +509,13 @@ async function attemptUnlock(password){
 
   if(!data || !data.salt){
     const salt = randomSaltB64();
-    cryptoKey = await deriveKey(password, salt);
+    cryptoKey = await deriveKey(password, salt, PBKDF2_ITERATIONS);
     cachedRaw = { salt:salt, check:await encryptText(cryptoKey, CHECK_PLAINTEXT), tagline:DEFAULT_TAGLINE, posts:[] };
     cachedSha = null;
     return true;
   }
 
-  const key = await deriveKey(password, data.salt);
+  const key = await deriveKey(password, data.salt, PBKDF2_ITERATIONS);
   try{
     const check = await decryptText(key, data.check);
     if(check !== CHECK_PLAINTEXT) return false;
@@ -523,6 +528,16 @@ async function attemptUnlock(password){
   return true;
 }
 
+async function ensureCommentAuth(password){
+  if(cachedRaw.commentAuth) return;
+  const salt = randomSaltB64();
+  const commentKey = await deriveKey(password, salt, COMMENTS_PBKDF2_ITERATIONS);
+  const check = await encryptText(commentKey, CHECK_PLAINTEXT);
+  const nextRaw = Object.assign({}, cachedRaw, { commentAuth: { salt:salt, check:check } });
+  cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Aktivera kommentarer');
+  cachedRaw = nextRaw;
+}
+
 lockForm.addEventListener('submit', async function(e){
   e.preventDefault();
   unlockBtn.disabled = true;
@@ -533,6 +548,11 @@ lockForm.addEventListener('submit', async function(e){
       lockError.textContent = '';
       cachedPosts = await decryptAll(cachedRaw.posts);
       taglineInput.value = cachedRaw.tagline || DEFAULT_TAGLINE;
+      try{
+        await ensureCommentAuth(passwordInput.value);
+      } catch(err){
+        console.error('Kunde inte aktivera kommentarer', err);
+      }
       setTimeout(function(){
         lockScreen.style.display = 'none';
         app.style.display = 'block';
@@ -592,7 +612,7 @@ saveTaglineBtn.addEventListener('click', async function(){
   taglineStatus.textContent = 'Sparar...';
   taglineStatus.className = '';
   try{
-    const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, tagline:tagline, posts:cachedRaw.posts };
+    const nextRaw = Object.assign({}, cachedRaw, { tagline:tagline });
     cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Uppdatera undertext');
     cachedRaw = nextRaw;
     taglineInput.value = tagline;
@@ -741,7 +761,7 @@ publishBtn.addEventListener('click', async function(){
       });
     }
 
-    const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, tagline:cachedRaw.tagline, posts:rawPosts };
+    const nextRaw = Object.assign({}, cachedRaw, { posts:rawPosts });
     const message = editingId ? ('Uppdatera inlägg: ' + title) : ('Nytt inlägg: ' + title);
     cachedSha = await ghSaveRaw(nextRaw, cachedSha, message);
     cachedRaw = nextRaw;
@@ -803,7 +823,7 @@ postsManage.addEventListener('click', async function(e){
     btn.disabled = true;
     try{
       const rawPosts = cachedRaw.posts.filter(function(p){ return p.id !== id; });
-      const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, tagline:cachedRaw.tagline, posts:rawPosts };
+      const nextRaw = Object.assign({}, cachedRaw, { posts:rawPosts });
       cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Ta bort inlägg: ' + post.title);
       cachedRaw = nextRaw;
       cachedPosts = cachedPosts.filter(function(p){ return p.id !== id; });

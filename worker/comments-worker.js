@@ -6,12 +6,18 @@
  * version control / reference.
  *
  * What it does: accepts a comment submission, verifies the site password
- * server-side the same way admin/index.html and index.html do (derive an
- * AES key from posts.json's stored salt, check it against the stored
- * "check" value), then encrypts the comment with that same key and
- * appends it to comments.json in the repo via the GitHub Contents API.
- * The GitHub token never reaches the browser — it lives only as a
- * Worker secret.
+ * server-side, then encrypts the comment and appends it to comments.json
+ * in the repo via the GitHub Contents API. The GitHub token never reaches
+ * the browser — it lives only as a Worker secret.
+ *
+ * Verification uses posts.json's separate `commentAuth` field (its own
+ * salt + check value), not the main `salt`/`check` used for post content.
+ * Cloudflare Workers cap PBKDF2 at 100,000 iterations, while the main site
+ * uses 150,000 (fine in real browsers) — reusing the main check here would
+ * either fail outright or derive a different key than posts were encrypted
+ * with. commentAuth is created by admin/index.html the first time it's
+ * unlocked after this feature was added, at a Worker-compatible iteration
+ * count, without touching the existing post encryption at all.
  */
 
 const GITHUB_OWNER = 'lottet';
@@ -19,7 +25,7 @@ const GITHUB_REPO = 'Videsblogg.github.io';
 const GITHUB_BRANCH = 'main';
 const ALLOWED_ORIGIN = 'https://www.videsblogg.se';
 
-const PBKDF2_ITERATIONS = 150000;
+const PBKDF2_ITERATIONS = 100000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 const MAX_NAME_LEN = 100;
 const MAX_TEXT_LEN = 2000;
@@ -152,14 +158,14 @@ export default {
 
     try{
       const { data: posts } = await githubGetJson('posts.json', token);
-      if(!posts || !posts.salt || !posts.check){
-        return jsonResponse({ error: 'Bloggen är inte redo för kommentarer ännu.' }, 400);
+      if(!posts || !posts.commentAuth){
+        return jsonResponse({ error: 'Kommentarer är inte aktiverade än. Logga in på adminsidan en gång för att aktivera dem.' }, 400);
       }
 
-      const key = await deriveKey(password, posts.salt);
+      const key = await deriveKey(password, posts.commentAuth.salt);
       let check;
       try{
-        check = await decryptText(key, posts.check);
+        check = await decryptText(key, posts.commentAuth.check);
       } catch(err){
         return jsonResponse({ error: 'Fel lösenord.' }, 401);
       }

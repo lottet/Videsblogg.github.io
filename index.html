@@ -360,6 +360,10 @@
    doesn't. This means posts.json is safe to publish in a public repo —
    fetching it directly only yields salt/IV/ciphertext, never plaintext. */
 const PBKDF2_ITERATIONS = 150000;
+/* Cloudflare Workers cap PBKDF2 at 100,000 iterations, so comments use
+   their own key (posts.json's commentAuth field) derived at this lower
+   count — kept separate from the main 150k scheme used for post content. */
+const COMMENTS_PBKDF2_ITERATIONS = 100000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
 /* Replace with the URL of your deployed Cloudflare Worker (see worker/comments-worker.js) */
@@ -377,11 +381,11 @@ function bufToB64(buf){
   for(let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin);
 }
-async function deriveKey(password, saltB64){
+async function deriveKey(password, saltB64, iterations){
   const enc = new TextEncoder();
   const baseKey = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:PBKDF2_ITERATIONS, hash:'SHA-256' },
+    { name:'PBKDF2', salt:b64ToBuf(saltB64), iterations:iterations, hash:'SHA-256' },
     baseKey,
     { name:'AES-GCM', length:256 },
     false,
@@ -406,6 +410,7 @@ const unlockBtn = document.getElementById('unlock-btn');
 const seal = document.getElementById('seal');
 
 let cryptoKey = null;
+let commentsKey = null;
 let rawData = null;
 let sitePassword = null;
 let allComments = [];
@@ -421,11 +426,12 @@ async function attemptUnlock(password){
 
   if(!data || !data.salt){
     cryptoKey = null;
+    commentsKey = null;
     rawData = { posts:[] };
     return true;
   }
 
-  const key = await deriveKey(password, data.salt);
+  const key = await deriveKey(password, data.salt, PBKDF2_ITERATIONS);
   try{
     const check = await decryptText(key, data.check);
     if(check !== CHECK_PLAINTEXT) return false;
@@ -434,6 +440,9 @@ async function attemptUnlock(password){
   }
   cryptoKey = key;
   rawData = data;
+  commentsKey = data.commentAuth
+    ? await deriveKey(password, data.commentAuth.salt, COMMENTS_PBKDF2_ITERATIONS)
+    : null;
   return true;
 }
 
@@ -512,11 +521,11 @@ async function loadComments(){
   if(!Array.isArray(list)) list = [];
 
   const decrypted = [];
-  if(cryptoKey){
+  if(commentsKey){
     for(const c of list){
       try{
-        const name = await decryptText(cryptoKey, c.name);
-        const text = await decryptText(cryptoKey, c.text);
+        const name = await decryptText(commentsKey, c.name);
+        const text = await decryptText(commentsKey, c.text);
         decrypted.push({ id:c.id, postId:c.postId, date:c.date, name:name, text:text });
       } catch(err){
         /* skip a comment that fails to decrypt rather than break the page */
