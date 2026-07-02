@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="sv">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Löv &amp; Bläck — Redigera</title>
+<title>Vides Blogg — Redigera</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -236,7 +235,7 @@
 
 <div id="lock-screen">
   <div class="seal-card">
-    <div class="seal" id="seal">L&amp;B</div>
+    <div class="seal" id="seal">VB</div>
     <h1>Redaktionen</h1>
     <p class="sub">Skriv lösenordet för att skapa och redigera inlägg. Samma lösenord används av läsarsidan för att dekryptera inläggen.</p>
     <form id="lock-form">
@@ -250,7 +249,7 @@
 <div id="app">
   <div class="app-inner">
     <header class="masthead">
-      <h1>Löv &amp; Bläck — Redaktionen</h1>
+      <h1>Vides Blogg — Redaktionen</h1>
       <p class="tagline meta">skriv och publicera nya inlägg</p>
     </header>
 
@@ -291,7 +290,10 @@
    Same scheme as index.html: the password derives an AES-GCM key via
    PBKDF2 and is never stored or compared as plaintext. Titles and bodies
    are encrypted before being written to posts.json; images are uploaded
-   as separate, unencrypted files (see note on ghUploadImage). */
+   as separate, unencrypted files (see note on ghUploadImage).
+   CHECK_PLAINTEXT must stay byte-identical to index.html's copy and must
+   never change once real posts exist — it's what the stored "check" field
+   is validated against on every unlock. */
 const PBKDF2_ITERATIONS = 150000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 
@@ -618,7 +620,10 @@ function processImageFile(file){
 function renderImagePreviews(){
   imagePreviews.innerHTML = '';
   currentImages.forEach(function(img, idx){
-    const src = img.dataUrl || img.path;
+    // Already-uploaded images are stored as a repo-root-relative path
+    // (e.g. "images/x.jpg"); this page now lives at /admin/, so it needs
+    // a leading slash to resolve against the site root, not /admin/.
+    const src = img.dataUrl || ('/' + img.path);
     const div = document.createElement('div');
     div.className = 'image-thumb';
     div.innerHTML = '<img src="' + escapeHtml(src) + '"><button data-idx="' + idx + '">×</button>';
