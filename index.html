@@ -237,6 +237,52 @@
   #empty-state h3{ color:rgba(255,248,238,0.8); font-size:20px; margin-bottom:8px; }
   #empty-state p{ font-size:14px; }
 
+  /* Comments */
+  .comments{ margin-top:24px; padding-top:20px; border-top:1px solid #E4D8C0; }
+  .comments-heading{
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    margin:0 0 14px;
+  }
+  .comment-list{ display:flex; flex-direction:column; gap:14px; margin-bottom:18px; }
+  .comment-item{ background:#FBF3E4; border-radius:4px; padding:12px 14px; }
+  .comment-meta{ font-size:12px; margin-bottom:4px; color:var(--muted); }
+  .comment-name{ font-weight:600; color:var(--ink); }
+  .comment-text{ font-size:14px; line-height:1.6; color:var(--ink-text); white-space:pre-wrap; }
+  .comment-form{ display:flex; flex-direction:column; gap:8px; }
+  .comment-name-input, .comment-text-input{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    padding:10px 12px;
+    border:1.5px solid #E4D8C0;
+    border-radius:4px;
+    background:#fff;
+    color:var(--ink);
+    outline:none;
+  }
+  .comment-name-input:focus, .comment-text-input:focus{ border-color:var(--violet); }
+  .comment-text-input{ min-height:70px; resize:vertical; font-family:'Inter',sans-serif; }
+  .comment-form-actions{ display:flex; justify-content:flex-end; }
+  .comment-submit{
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    font-weight:600;
+    background:var(--ink);
+    color:var(--parchment);
+    border:none;
+    padding:9px 18px;
+    border-radius:4px;
+    cursor:pointer;
+  }
+  .comment-submit:hover{ background:var(--violet-dark); }
+  .comment-submit:disabled{ opacity:0.6; cursor:default; }
+  .comment-status{ font-size:12px; margin:6px 0 0; min-height:16px; }
+  .comment-status.error{ color:var(--coral-dark); }
+
   /* Lightbox */
   #lightbox{
     display:none;
@@ -316,6 +362,8 @@
 const PBKDF2_ITERATIONS = 150000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
+/* Replace with the URL of your deployed Cloudflare Worker (see worker/comments-worker.js) */
+const COMMENTS_WORKER_URL = 'https://REPLACE-ME.workers.dev';
 
 function b64ToBuf(b64){
   const bin = atob(b64);
@@ -359,6 +407,8 @@ const seal = document.getElementById('seal');
 
 let cryptoKey = null;
 let rawData = null;
+let sitePassword = null;
+let allComments = [];
 
 async function attemptUnlock(password){
   let data = null;
@@ -393,11 +443,13 @@ lockForm.addEventListener('submit', async function(e){
   try{
     const ok = await attemptUnlock(passwordInput.value);
     if(ok){
+      sitePassword = passwordInput.value;
       seal.classList.add('cracked');
       lockError.textContent = '';
-      setTimeout(function(){
+      setTimeout(async function(){
         lockScreen.style.display = 'none';
         app.style.display = 'block';
+        await loadComments();
         loadPosts();
       }, 350);
       return;
@@ -447,6 +499,31 @@ async function loadPosts(){
   allPosts.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
   buildArchive();
   renderPosts();
+}
+
+async function loadComments(){
+  let list = [];
+  try{
+    const res = await fetch('./comments.json', {cache:'no-store'});
+    if(res.ok) list = await res.json();
+  } catch(err){
+    list = [];
+  }
+  if(!Array.isArray(list)) list = [];
+
+  const decrypted = [];
+  if(cryptoKey){
+    for(const c of list){
+      try{
+        const name = await decryptText(cryptoKey, c.name);
+        const text = await decryptText(cryptoKey, c.text);
+        decrypted.push({ id:c.id, postId:c.postId, date:c.date, name:name, text:text });
+      } catch(err){
+        /* skip a comment that fails to decrypt rather than break the page */
+      }
+    }
+  }
+  allComments = decrypted;
 }
 
 function buildArchive(){
@@ -552,11 +629,83 @@ function renderPosts(){
       '<div class="post-meta meta">' + formatDate(post.date) + '</div>' +
       '<h2>' + escapeHtml(post.title) + '</h2>' +
       '<div class="post-body">' + escapeHtml(post.body) + '</div>' +
-      imagesHtml;
+      imagesHtml +
+      renderComments(post.id);
 
     postsListEl.appendChild(card);
   });
 }
+
+function renderComments(postId){
+  const postComments = allComments
+    .filter(function(c){ return c.postId === postId; })
+    .sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+
+  let listHtml = '';
+  if(postComments.length){
+    listHtml = '<div class="comment-list">' + postComments.map(function(c){
+      return '<div class="comment-item">' +
+        '<div class="comment-meta"><span class="comment-name">' + escapeHtml(c.name) + '</span> · <span class="meta">' + formatDate(c.date) + '</span></div>' +
+        '<div class="comment-text">' + escapeHtml(c.text) + '</div>' +
+      '</div>';
+    }).join('') + '</div>';
+  }
+
+  const heading = 'Kommentarer' + (postComments.length ? ' (' + postComments.length + ')' : '');
+
+  return (
+    '<div class="comments">' +
+      '<h3 class="comments-heading">' + heading + '</h3>' +
+      listHtml +
+      '<form class="comment-form" data-post-id="' + escapeHtml(postId) + '">' +
+        '<input type="text" class="comment-name-input" placeholder="Namn" maxlength="100" required>' +
+        '<textarea class="comment-text-input" placeholder="Skriv en kommentar..." maxlength="2000" required></textarea>' +
+        '<div class="comment-form-actions">' +
+          '<button type="submit" class="comment-submit">Skicka</button>' +
+        '</div>' +
+        '<p class="comment-status"></p>' +
+      '</form>' +
+    '</div>'
+  );
+}
+
+postsListEl.addEventListener('submit', async function(e){
+  const form = e.target.closest('.comment-form');
+  if(!form) return;
+  e.preventDefault();
+
+  const postId = form.dataset.postId;
+  const nameInput = form.querySelector('.comment-name-input');
+  const textInput = form.querySelector('.comment-text-input');
+  const statusEl = form.querySelector('.comment-status');
+  const submitBtn = form.querySelector('.comment-submit');
+
+  const name = nameInput.value.trim();
+  const text = textInput.value.trim();
+  if(!name || !text) return;
+
+  submitBtn.disabled = true;
+  statusEl.textContent = 'Skickar...';
+  statusEl.className = 'comment-status';
+
+  try{
+    const res = await fetch(COMMENTS_WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId:postId, password:sitePassword, name:name, text:text })
+    });
+    const result = await res.json().catch(function(){ return {}; });
+    if(!res.ok || result.error){
+      throw new Error(result.error || ('Kunde inte skicka (' + res.status + ')'));
+    }
+    await loadComments();
+    renderPosts();
+  } catch(err){
+    statusEl.textContent = err.message;
+    statusEl.className = 'comment-status error';
+    submitBtn.disabled = false;
+  }
+});
 
 const lightbox = document.getElementById('lightbox');
 const lightboxImg = document.getElementById('lightbox-img');
