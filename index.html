@@ -231,10 +231,31 @@
     object-fit:cover;
     border-radius:4px;
     box-shadow:0 4px 10px rgba(0,0,0,0.15);
+    cursor:zoom-in;
   }
   #empty-state{ text-align:center; padding:60px 20px; color:rgba(255,248,238,0.5); }
   #empty-state h3{ color:rgba(255,248,238,0.8); font-size:20px; margin-bottom:8px; }
   #empty-state p{ font-size:14px; }
+
+  /* Lightbox */
+  #lightbox{
+    display:none;
+    position:fixed;
+    inset:0;
+    z-index:200;
+    background:rgba(15,12,25,0.9);
+    align-items:center;
+    justify-content:center;
+    padding:32px;
+    cursor:zoom-out;
+  }
+  #lightbox.open{ display:flex; }
+  #lightbox img{
+    max-width:100%;
+    max-height:100%;
+    border-radius:6px;
+    box-shadow:0 30px 70px rgba(0,0,0,0.5);
+  }
 
   @media (max-width:760px){
     .layout{ grid-template-columns:1fr; }
@@ -279,6 +300,10 @@
       </div>
     </main>
   </div>
+</div>
+
+<div id="lightbox">
+  <img id="lightbox-img" src="" alt="">
 </div>
 
 <script>
@@ -530,6 +555,28 @@ function renderPosts(){
     postsListEl.appendChild(card);
   });
 }
+
+const lightbox = document.getElementById('lightbox');
+const lightboxImg = document.getElementById('lightbox-img');
+
+postsListEl.addEventListener('click', function(e){
+  const img = e.target.closest('.post-images img');
+  if(!img) return;
+  lightboxImg.src = img.src;
+  lightbox.classList.add('open');
+});
+
+lightbox.addEventListener('click', function(){
+  lightbox.classList.remove('open');
+  lightboxImg.src = '';
+});
+
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape') {
+    lightbox.classList.remove('open');
+    lightboxImg.src = '';
+  }
+});
 
 function escapeHtml(str){
   const div = document.createElement('div');

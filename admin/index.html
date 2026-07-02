@@ -260,7 +260,7 @@
         <input type="text" id="title-input" placeholder="Ge inlägget en rubrik">
 
         <label for="date-input">Datum</label>
-        <input type="text" id="date-input" readonly>
+        <input type="date" id="date-input">
 
         <label for="body-input">Beskrivning / text</label>
         <textarea id="body-input" placeholder="Skriv vad du har på hjärtat..."></textarea>
@@ -573,16 +573,32 @@ let currentImages = []; // { dataUrl } for new/unsaved images, { path } for alre
 let editingId = null;
 let currentDate = new Date().toISOString();
 
+function toDateInputValue(iso){
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
 function resetForm(){
   editingId = null;
   titleInput.value = '';
   bodyInput.value = '';
   currentImages = [];
   currentDate = new Date().toISOString();
-  dateInput.value = new Date(currentDate).toLocaleDateString('sv-SE', {year:'numeric', month:'long', day:'numeric'});
+  dateInput.value = toDateInputValue(currentDate);
   renderImagePreviews();
   setStatus('', '');
 }
+
+dateInput.addEventListener('change', function(){
+  if(!dateInput.value) return;
+  const [y, m, d] = dateInput.value.split('-').map(Number);
+  const next = new Date(currentDate);
+  next.setFullYear(y, m - 1, d);
+  currentDate = next.toISOString();
+});
 
 cancelBtn.addEventListener('click', resetForm);
 
@@ -741,7 +757,7 @@ postsManage.addEventListener('click', async function(e){
     bodyInput.value = post.body;
     currentImages = (post.images || []).map(function(path){ return { path:path }; });
     currentDate = post.date;
-    dateInput.value = new Date(currentDate).toLocaleDateString('sv-SE', {year:'numeric', month:'long', day:'numeric'});
+    dateInput.value = toDateInputValue(currentDate);
     renderImagePreviews();
     setStatus('Redigerar "' + post.title + '". Publicera för att spara ändringen.', '');
     window.scrollTo({top:0, behavior:'smooth'});
