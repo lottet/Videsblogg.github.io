@@ -282,7 +282,7 @@
   <div class="layout">
     <header class="masthead">
       <h1>Vides Blogg</h1>
-      <p class="tagline meta">en samling anteckningar, tankar och resor</p>
+      <p class="tagline meta" id="tagline-text">en samling anteckningar, tankar och resor</p>
     </header>
 
     <aside class="archive">
@@ -315,6 +315,7 @@
    fetching it directly only yields salt/IV/ciphertext, never plaintext. */
 const PBKDF2_ITERATIONS = 150000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
+const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
 
 function b64ToBuf(b64){
   const bin = atob(b64);
@@ -429,6 +430,7 @@ let activeFilter = null;
 const MONTHS_SV = ['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'];
 
 async function loadPosts(){
+  document.getElementById('tagline-text').textContent = (rawData && rawData.tagline) || DEFAULT_TAGLINE;
   const decrypted = [];
   if(cryptoKey && rawData && rawData.posts){
     for(const p of rawData.posts){

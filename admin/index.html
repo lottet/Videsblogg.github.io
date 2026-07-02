@@ -254,6 +254,18 @@
     </header>
 
     <section class="block">
+      <h2>Undertext på förstasidan</h2>
+      <div class="panel">
+        <label for="tagline-input">Texten under rubriken på läsarsidan</label>
+        <input type="text" id="tagline-input" placeholder="en samling anteckningar, tankar och resor">
+        <div class="form-actions">
+          <button class="btn-primary" id="save-tagline-btn">Spara undertext</button>
+        </div>
+        <p id="tagline-status"></p>
+      </div>
+    </section>
+
+    <section class="block">
       <h2>Nytt inlägg</h2>
       <div class="panel">
         <label for="title-input">Rubrik</label>
@@ -296,6 +308,7 @@
    is validated against on every unlock. */
 const PBKDF2_ITERATIONS = 150000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
+const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
 
 function b64ToBuf(b64){
   const bin = atob(b64);
@@ -492,7 +505,7 @@ async function attemptUnlock(password){
   if(!data || !data.salt){
     const salt = randomSaltB64();
     cryptoKey = await deriveKey(password, salt);
-    cachedRaw = { salt:salt, check:await encryptText(cryptoKey, CHECK_PLAINTEXT), posts:[] };
+    cachedRaw = { salt:salt, check:await encryptText(cryptoKey, CHECK_PLAINTEXT), tagline:DEFAULT_TAGLINE, posts:[] };
     cachedSha = null;
     return true;
   }
@@ -519,6 +532,7 @@ lockForm.addEventListener('submit', async function(e){
       seal.classList.add('cracked');
       lockError.textContent = '';
       cachedPosts = await decryptAll(cachedRaw.posts);
+      taglineInput.value = cachedRaw.tagline || DEFAULT_TAGLINE;
       setTimeout(function(){
         lockScreen.style.display = 'none';
         app.style.display = 'block';
@@ -568,6 +582,29 @@ const cancelBtn = document.getElementById('cancel-btn');
 const publishBtn = document.getElementById('publish-btn');
 const statusMsg = document.getElementById('status-msg');
 const postsManage = document.getElementById('posts-manage');
+const taglineInput = document.getElementById('tagline-input');
+const saveTaglineBtn = document.getElementById('save-tagline-btn');
+const taglineStatus = document.getElementById('tagline-status');
+
+saveTaglineBtn.addEventListener('click', async function(){
+  const tagline = taglineInput.value.trim() || DEFAULT_TAGLINE;
+  saveTaglineBtn.disabled = true;
+  taglineStatus.textContent = 'Sparar...';
+  taglineStatus.className = '';
+  try{
+    const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, tagline:tagline, posts:cachedRaw.posts };
+    cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Uppdatera undertext');
+    cachedRaw = nextRaw;
+    taglineInput.value = tagline;
+    taglineStatus.textContent = 'Undertext sparad.';
+    taglineStatus.className = 'ok';
+  } catch(err){
+    taglineStatus.textContent = err.message;
+    taglineStatus.className = 'error';
+  } finally {
+    saveTaglineBtn.disabled = false;
+  }
+});
 
 let currentImages = []; // { dataUrl } for new/unsaved images, { path } for already-uploaded ones
 let editingId = null;
@@ -704,7 +741,7 @@ publishBtn.addEventListener('click', async function(){
       });
     }
 
-    const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, posts:rawPosts };
+    const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, tagline:cachedRaw.tagline, posts:rawPosts };
     const message = editingId ? ('Uppdatera inlägg: ' + title) : ('Nytt inlägg: ' + title);
     cachedSha = await ghSaveRaw(nextRaw, cachedSha, message);
     cachedRaw = nextRaw;
@@ -766,7 +803,7 @@ postsManage.addEventListener('click', async function(e){
     btn.disabled = true;
     try{
       const rawPosts = cachedRaw.posts.filter(function(p){ return p.id !== id; });
-      const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, posts:rawPosts };
+      const nextRaw = { salt:cachedRaw.salt, check:cachedRaw.check, tagline:cachedRaw.tagline, posts:rawPosts };
       cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Ta bort inlägg: ' + post.title);
       cachedRaw = nextRaw;
       cachedPosts = cachedPosts.filter(function(p){ return p.id !== id; });
