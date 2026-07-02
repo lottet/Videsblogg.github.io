@@ -707,7 +707,13 @@ postsListEl.addEventListener('submit', async function(e){
     if(!res.ok || result.error){
       throw new Error(result.error || ('Kunde inte skicka (' + res.status + ')'));
     }
-    await loadComments();
+    /* The Worker's success response means the comment is already committed
+       to GitHub — re-fetching comments.json here would almost always show
+       the stale version, since GitHub Pages can take a minute or more to
+       rebuild after a commit. Show it locally right away instead; other
+       visitors (and this browser, on next reload) pick it up once the
+       rebuild catches up. */
+    allComments.push({ id:'local_' + Date.now(), postId:postId, date:new Date().toISOString(), name:name, text:text });
     renderPosts();
   } catch(err){
     statusEl.textContent = err.message;
