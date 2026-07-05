@@ -36,55 +36,6 @@
   h1,h2,h3,.serif{ font-family:'Fraunces', serif; }
   .meta{ font-family:'Space Mono', monospace; letter-spacing:0.02em; }
 
-  /* Settings gear — always available, independent of lock state */
-  #settings-toggle{
-    position:fixed;
-    top:18px;
-    right:18px;
-    z-index:50;
-    font-family:'Inter',sans-serif;
-    font-size:13px;
-    font-weight:500;
-    background:rgba(255,248,238,0.08);
-    border:1.5px solid rgba(255,248,238,0.25);
-    color:rgba(255,248,238,0.85);
-    padding:8px 14px;
-    border-radius:20px;
-    cursor:pointer;
-  }
-  #settings-toggle:hover{ border-color:var(--gold); color:var(--gold); }
-  #settings-panel{
-    display:none;
-    position:fixed;
-    top:60px;
-    right:18px;
-    z-index:50;
-    width:min(360px, calc(100vw - 36px));
-    max-height:calc(100vh - 80px);
-    overflow-y:auto;
-    background:var(--parchment);
-    border-radius:6px;
-    padding:24px 24px 20px;
-    box-shadow:0 20px 45px rgba(0,0,0,0.4);
-  }
-  #settings-panel.open{ display:block; }
-  #settings-panel h2{ font-size:16px; margin:0 0 16px; color:var(--ink); }
-  #settings-panel label{
-    display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.08em;
-    color:var(--muted); margin-bottom:6px; margin-top:14px;
-  }
-  #settings-panel label:first-of-type{ margin-top:0; }
-  #settings-panel input[type=text], #settings-panel input[type=password]{
-    width:100%; font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px;
-    border:1.5px solid #E4D8C0; border-radius:4px; background:#fff; color:var(--ink); outline:none;
-  }
-  #settings-panel input:focus{ border-color:var(--teal); }
-  .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5; }
-  .settings-save-row{ margin-top:18px; display:flex; justify-content:flex-end; }
-  #settings-status{ font-size:12px; margin-top:10px; min-height:16px; }
-  #settings-status.ok{ color:var(--teal-dark); }
-  #settings-status.error{ color:var(--coral-dark); }
-
   /* Lock screen */
   #lock-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .seal-card{
@@ -115,12 +66,12 @@
   .seal-card h1{ font-size:24px; margin:0 0 6px; color:var(--ink); }
   .seal-card p.sub{ color:var(--muted); font-size:14px; margin:0 0 28px; }
   #lock-form{ display:flex; flex-direction:column; gap:14px; }
-  #password-input{
+  #username-input, #password-input{
     font-family:'Space Mono', monospace; font-size:16px; padding:13px 16px;
     border-radius:4px; border:1.5px solid #E4D8C0; background:#fff; color:var(--ink);
     text-align:center; letter-spacing:0.08em; outline:none;
   }
-  #password-input:focus{ border-color:var(--teal); box-shadow:0 0 0 3px rgba(47,168,152,0.15); }
+  #username-input:focus, #password-input:focus{ border-color:var(--teal); box-shadow:0 0 0 3px rgba(47,168,152,0.15); }
   #password-input.shake{ animation:shake .4s; border-color:var(--coral-dark); }
   @keyframes shake{ 0%,100%{transform:translateX(0);} 20%{transform:translateX(-8px);} 40%{transform:translateX(8px);} 60%{transform:translateX(-5px);} 80%{transform:translateX(5px);} }
   #unlock-btn{
@@ -215,30 +166,13 @@
 </head>
 <body>
 
-<button id="settings-toggle">⚙ GitHub-inställningar</button>
-<div class="panel" id="settings-panel">
-  <h2>Anslutning till GitHub</h2>
-  <label for="gh-owner">GitHub-användarnamn</label>
-  <input type="text" id="gh-owner" placeholder="t.ex. anna-blogg">
-  <label for="gh-repo">Repository-namn</label>
-  <input type="text" id="gh-repo" placeholder="t.ex. blogg">
-  <label for="gh-branch">Branch</label>
-  <input type="text" id="gh-branch" placeholder="main" value="main">
-  <label for="gh-token">Personal access token</label>
-  <input type="password" id="gh-token" placeholder="ghp_...">
-  <p class="hint">Token skapas på GitHub under Settings → Developer settings → Fine-grained tokens, med skrivrättighet ("Contents: Read and write") för just det här repot. Den sparas endast i den här webbläsaren och behövs innan du kan låsa upp — annars kan sidan inte hämta eller spara krypterade inlägg.</p>
-  <div class="settings-save-row">
-    <button class="btn-primary" id="save-settings-btn">Spara inställningar</button>
-  </div>
-  <p id="settings-status"></p>
-</div>
-
 <div id="lock-screen">
   <div class="seal-card">
     <div class="seal" id="seal">VB</div>
     <h1>Redaktionen</h1>
-    <p class="sub">Skriv lösenordet för att skapa och redigera inlägg. Samma lösenord används av läsarsidan för att dekryptera inläggen.</p>
+    <p class="sub">Logga in för att skapa och redigera inlägg. Lösenordet används även för att dekryptera inläggen på läsarsidan.</p>
     <form id="lock-form">
+      <input type="text" id="username-input" placeholder="Användarnamn" autocomplete="off">
       <input type="password" id="password-input" placeholder="Lösenord" autocomplete="off">
       <p id="lock-error"></p>
       <button type="submit" id="unlock-btn">Lås upp</button>
@@ -302,7 +236,7 @@
    Same scheme as index.html: the password derives an AES-GCM key via
    PBKDF2 and is never stored or compared as plaintext. Titles and bodies
    are encrypted before being written to posts.json; images are uploaded
-   as separate, unencrypted files (see note on ghUploadImage).
+   as separate, unencrypted files (see note on uploadImage).
    CHECK_PLAINTEXT must stay byte-identical to index.html's copy and must
    never change once real posts exist — it's what the stored "check" field
    is validated against on every unlock. */
@@ -314,6 +248,13 @@ const PBKDF2_ITERATIONS = 150000;
 const COMMENTS_PBKDF2_ITERATIONS = 100000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
+
+/* Same Worker used for comments (worker/comments-worker.js), extended
+   with /admin/* routes. The GitHub token lives only as a Worker secret —
+   this page never holds one. Every /admin/* call includes the login
+   username/password so the Worker can verify them (against its own
+   ADMIN_USERNAME/ADMIN_PASSWORD secrets) before touching GitHub. */
+const ADMIN_WORKER_URL = 'https://my-worker.sam-metsi.workers.dev/';
 
 function b64ToBuf(b64){
   const bin = atob(b64);
@@ -355,105 +296,34 @@ async function decryptText(key, field){
   return new TextDecoder().decode(pt);
 }
 
-/* ---------- Settings (GitHub connection) ---------- */
-const SETTINGS_KEY = 'blogg-admin-settings';
-const settingsToggle = document.getElementById('settings-toggle');
-const settingsPanel = document.getElementById('settings-panel');
-const ghOwnerInput = document.getElementById('gh-owner');
-const ghRepoInput = document.getElementById('gh-repo');
-const ghBranchInput = document.getElementById('gh-branch');
-const ghTokenInput = document.getElementById('gh-token');
-const saveSettingsBtn = document.getElementById('save-settings-btn');
-const settingsStatus = document.getElementById('settings-status');
-
-function loadSettings(){
-  try{
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if(!raw) return null;
-    return JSON.parse(raw);
-  } catch(e){ return null; }
-}
-function getSettings(){
-  return {
-    owner: ghOwnerInput.value.trim(),
-    repo: ghRepoInput.value.trim(),
-    branch: ghBranchInput.value.trim() || 'main',
-    token: ghTokenInput.value.trim()
-  };
-}
-
-(function initSettingsForm(){
-  const s = loadSettings();
-  if(s){
-    ghOwnerInput.value = s.owner || '';
-    ghRepoInput.value = s.repo || '';
-    ghBranchInput.value = s.branch || 'main';
-    ghTokenInput.value = s.token || '';
-  } else {
-    settingsPanel.classList.add('open');
-  }
-})();
-
-settingsToggle.addEventListener('click', function(){
-  settingsPanel.classList.toggle('open');
-});
-
-saveSettingsBtn.addEventListener('click', function(){
-  const s = getSettings();
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-  settingsStatus.textContent = 'Inställningar sparade i den här webbläsaren.';
-  settingsStatus.className = 'ok';
-});
-
-/* ---------- GitHub Contents API ---------- */
-function b64EncodeUnicode(str){
-  return btoa(unescape(encodeURIComponent(str)));
-}
-function b64DecodeUnicode(str){
-  return decodeURIComponent(escape(atob(str)));
-}
-
-async function ghFetchRaw(){
-  const s = getSettings();
-  if(!s.owner || !s.repo || !s.token){
-    throw new Error('no-settings');
-  }
-  const url = 'https://api.github.com/repos/' + s.owner + '/' + s.repo + '/contents/posts.json?ref=' + s.branch;
-  const res = await fetch(url, {
-    headers:{ 'Authorization':'token ' + s.token, 'Accept':'application/vnd.github+json' }
+/* ---------- Worker-proxied GitHub actions ---------- */
+async function workerPost(path, body){
+  const res = await fetch(ADMIN_WORKER_URL + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
   });
-  if(res.status === 404) return { data:null, sha:null };
-  if(!res.ok) throw new Error('Kunde inte hämta posts.json (' + res.status + ')');
-  const json = await res.json();
-  const content = b64DecodeUnicode(json.content.replace(/\n/g, ''));
-  const data = content.trim() ? JSON.parse(content) : null;
-  return { data:data, sha:json.sha };
+  const result = await res.json().catch(function(){ return {}; });
+  return { res:res, result:result };
+}
+
+async function ghFetchRaw(username, password){
+  const { res, result } = await workerPost('admin/posts', { username:username, password:password });
+  if(res.status === 401) return { unauthorized:true };
+  if(!res.ok) throw new Error(result.error || ('Kunde inte hämta posts.json (' + res.status + ')'));
+  return { data:result.data, sha:result.sha };
 }
 
 async function ghSaveRaw(dataObj, sha, message){
-  const s = getSettings();
-  const url = 'https://api.github.com/repos/' + s.owner + '/' + s.repo + '/contents/posts.json';
-  const body = {
-    message: message || 'Uppdatera inlägg',
-    content: b64EncodeUnicode(JSON.stringify(dataObj, null, 2)),
-    branch: s.branch
-  };
-  if(sha) body.sha = sha;
-  const res = await fetch(url, {
-    method:'PUT',
-    headers:{
-      'Authorization':'token ' + s.token,
-      'Accept':'application/vnd.github+json',
-      'Content-Type':'application/json'
-    },
-    body: JSON.stringify(body)
+  const { res, result } = await workerPost('admin/save', {
+    username: adminUsername,
+    password: adminPassword,
+    data: dataObj,
+    sha: sha,
+    message: message || 'Uppdatera inlägg'
   });
-  if(!res.ok){
-    const err = await res.json().catch(function(){ return {}; });
-    throw new Error(err.message || ('Kunde inte spara (' + res.status + ')'));
-  }
-  const json = await res.json();
-  return json.content.sha;
+  if(!res.ok) throw new Error(result.error || ('Kunde inte spara (' + res.status + ')'));
+  return result.sha;
 }
 
 /* Images are stored as separate committed files (images/<name>.jpg)
@@ -463,32 +333,21 @@ async function ghSaveRaw(dataObj, sha, message){
    client-side for every <img>, which is a meaningfully bigger change than
    this pass covers. Only titles/bodies are private for now. */
 async function ghUploadImage(dataUrl, path){
-  const s = getSettings();
-  const base64 = dataUrl.split(',')[1];
-  const url = 'https://api.github.com/repos/' + s.owner + '/' + s.repo + '/contents/' + path;
-  const res = await fetch(url, {
-    method:'PUT',
-    headers:{
-      'Authorization':'token ' + s.token,
-      'Accept':'application/vnd.github+json',
-      'Content-Type':'application/json'
-    },
-    body: JSON.stringify({
-      message: 'Ladda upp bild: ' + path,
-      content: base64,
-      branch: s.branch
-    })
+  const content = dataUrl.split(',')[1];
+  const { res, result } = await workerPost('admin/upload-image', {
+    username: adminUsername,
+    password: adminPassword,
+    path: path,
+    content: content
   });
-  if(!res.ok){
-    const err = await res.json().catch(function(){ return {}; });
-    throw new Error(err.message || ('Kunde inte ladda upp bild (' + res.status + ')'));
-  }
+  if(!res.ok) throw new Error(result.error || ('Kunde inte ladda upp bild (' + res.status + ')'));
 }
 
 /* ---------- Lock screen ---------- */
 const lockScreen = document.getElementById('lock-screen');
 const app = document.getElementById('app');
 const lockForm = document.getElementById('lock-form');
+const usernameInput = document.getElementById('username-input');
 const passwordInput = document.getElementById('password-input');
 const lockError = document.getElementById('lock-error');
 const unlockBtn = document.getElementById('unlock-btn');
@@ -498,13 +357,12 @@ let cryptoKey = null;
 let cachedRaw = null;
 let cachedSha = null;
 let cachedPosts = [];
+let adminUsername = null;
+let adminPassword = null;
 
-async function attemptUnlock(password){
-  const s = getSettings();
-  if(!s.owner || !s.repo || !s.token){
-    throw new Error('Fyll i GitHub-inställningar (⚙ uppe till höger) innan du låser upp.');
-  }
-  const fetched = await ghFetchRaw();
+async function attemptUnlock(username, password){
+  const fetched = await ghFetchRaw(username, password);
+  if(fetched.unauthorized) return false;
   const data = fetched.data;
 
   if(!data || !data.salt){
@@ -528,10 +386,10 @@ async function attemptUnlock(password){
   return true;
 }
 
-async function ensureCommentAuth(password){
+async function ensureCommentAuth(){
   if(cachedRaw.commentAuth) return;
   const salt = randomSaltB64();
-  const commentKey = await deriveKey(password, salt, COMMENTS_PBKDF2_ITERATIONS);
+  const commentKey = await deriveKey(adminPassword, salt, COMMENTS_PBKDF2_ITERATIONS);
   const check = await encryptText(commentKey, CHECK_PLAINTEXT);
   const nextRaw = Object.assign({}, cachedRaw, { commentAuth: { salt:salt, check:check } });
   cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Aktivera kommentarer');
@@ -542,14 +400,18 @@ lockForm.addEventListener('submit', async function(e){
   e.preventDefault();
   unlockBtn.disabled = true;
   try{
-    const ok = await attemptUnlock(passwordInput.value);
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+    const ok = await attemptUnlock(username, password);
     if(ok){
+      adminUsername = username;
+      adminPassword = password;
       seal.classList.add('cracked');
       lockError.textContent = '';
       cachedPosts = await decryptAll(cachedRaw.posts);
       taglineInput.value = cachedRaw.tagline || DEFAULT_TAGLINE;
       try{
-        await ensureCommentAuth(passwordInput.value);
+        await ensureCommentAuth();
       } catch(err){
         console.error('Kunde inte aktivera kommentarer', err);
       }
@@ -561,7 +423,7 @@ lockForm.addEventListener('submit', async function(e){
       }, 350);
       return;
     }
-    showLockError('Fel lösenord. Försök igen.');
+    showLockError('Fel användarnamn eller lösenord. Försök igen.');
   } catch(err){
     showLockError(err.message || 'Något gick fel. Försök igen.');
   } finally {

@@ -1,23 +1,27 @@
 /*
- * Vides Blogg — comments Worker
+ * Vides Blogg — comments + admin Worker
  *
  * Not deployed automatically — paste this into a Cloudflare Worker (see
  * README-worker.md for the exact setup steps). It's kept here only for
  * version control / reference.
  *
- * What it does: accepts a comment submission, verifies the site password
- * server-side, then encrypts the comment and appends it to comments.json
- * in the repo via the GitHub Contents API. The GitHub token never reaches
- * the browser — it lives only as a Worker secret.
+ * Two jobs, both proxying the GitHub Contents API with a token that only
+ * ever lives as a Worker secret:
  *
- * Verification uses posts.json's separate `commentAuth` field (its own
- * salt + check value), not the main `salt`/`check` used for post content.
- * Cloudflare Workers cap PBKDF2 at 100,000 iterations, while the main site
- * uses 150,000 (fine in real browsers) — reusing the main check here would
- * either fail outright or derive a different key than posts were encrypted
- * with. commentAuth is created by admin/index.html the first time it's
- * unlocked after this feature was added, at a Worker-compatible iteration
- * count, without touching the existing post encryption at all.
+ * 1. POST / (or /comment) — a reader submits a comment. Verified against
+ *    posts.json's separate `commentAuth` field (its own salt + check
+ *    value), not the main `salt`/`check` used for post content. Cloudflare
+ *    Workers cap PBKDF2 at 100,000 iterations, while the main site uses
+ *    150,000 (fine in real browsers) — reusing the main check here would
+ *    either fail outright or derive a different key than posts were
+ *    encrypted with. commentAuth is created by admin/index.html the first
+ *    time it's unlocked after this feature was added.
+ *
+ * 2. POST /admin/posts, /admin/save, /admin/upload-image — the admin panel
+ *    logs in with a username/password checked against this Worker's own
+ *    ADMIN_USERNAME/ADMIN_PASSWORD secrets, then every publish/delete/
+ *    image-upload/tagline-save goes through here instead of the browser
+ *    calling GitHub directly. admin/index.html never holds a GitHub token.
  */
 
 const GITHUB_OWNER = 'lottet';
@@ -127,6 +131,145 @@ async function githubPutJson(path, dataObj, sha, message, token){
     const err = await res.json().catch(function(){ return {}; });
     throw new Error(err.message || ('Kunde inte spara ' + path + ' (' + res.status + ')'));
   }
+  const json = await res.json();
+  return json.content.sha;
+}
+
+async function githubPutFile(path, base64Content, message, token){
+  const url = 'https://api.github.com/repos/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/contents/' + path;
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'token ' + token,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'vides-blogg-comments-worker'
+    },
+    body: JSON.stringify({ message:message, content:base64Content, branch:GITHUB_BRANCH })
+  });
+  if(!res.ok){
+    const err = await res.json().catch(function(){ return {}; });
+    throw new Error(err.message || ('Kunde inte ladda upp bild (' + res.status + ')'));
+  }
+}
+
+/* ---------- Comment submission ---------- */
+async function handleComment(request, env){
+  let body;
+  try{
+    body = await request.json();
+  } catch(err){
+    return jsonResponse({ error: 'Ogiltig förfrågan.' }, 400);
+  }
+
+  const postId = String(body.postId || '').trim();
+  const password = String(body.password || '');
+  const name = String(body.name || '').trim().slice(0, MAX_NAME_LEN);
+  const text = String(body.text || '').trim().slice(0, MAX_TEXT_LEN);
+
+  if(!postId || !password || !name || !text){
+    return jsonResponse({ error: 'Fyll i namn och kommentar.' }, 400);
+  }
+
+  const token = env.GITHUB_TOKEN;
+
+  try{
+    const { data: posts } = await githubGetJson('posts.json', token);
+    if(!posts || !posts.commentAuth){
+      return jsonResponse({ error: 'Kommentarer är inte aktiverade än. Logga in på adminsidan en gång för att aktivera dem.' }, 400);
+    }
+
+    const key = await deriveKey(password, posts.commentAuth.salt);
+    let check;
+    try{
+      check = await decryptText(key, posts.commentAuth.check);
+    } catch(err){
+      return jsonResponse({ error: 'Fel lösenord.' }, 401);
+    }
+    if(check !== CHECK_PLAINTEXT){
+      return jsonResponse({ error: 'Fel lösenord.' }, 401);
+    }
+
+    const { data: existing, sha } = await githubGetJson('comments.json', token);
+    const comments = Array.isArray(existing) ? existing : [];
+
+    comments.push({
+      id: 'c_' + Date.now(),
+      postId: postId,
+      date: new Date().toISOString(),
+      name: await encryptText(key, name),
+      text: await encryptText(key, text)
+    });
+
+    await githubPutJson('comments.json', comments, sha, 'Ny kommentar', token);
+
+    return jsonResponse({ ok:true });
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
+}
+
+/* ---------- Admin auth ---------- */
+function safeCompare(a, b){
+  if(typeof a !== 'string' || typeof b !== 'string') return false;
+  if(a.length !== b.length) return false;
+  let result = 0;
+  for(let i = 0; i < a.length; i++){
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+function checkAdminAuth(body, env){
+  return safeCompare(String(body.username || ''), env.ADMIN_USERNAME || '') &&
+    safeCompare(String(body.password || ''), env.ADMIN_PASSWORD || '');
+}
+
+async function handleAdminGetPosts(request, env){
+  let body;
+  try{ body = await request.json(); } catch(err){ return jsonResponse({ error:'Ogiltig förfrågan.' }, 400); }
+  if(!checkAdminAuth(body, env)) return jsonResponse({ error:'Fel användarnamn eller lösenord.' }, 401);
+
+  const token = env.GITHUB_TOKEN;
+  try{
+    const { data, sha } = await githubGetJson('posts.json', token);
+    return jsonResponse({ data:data, sha:sha });
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
+}
+
+async function handleAdminSave(request, env){
+  let body;
+  try{ body = await request.json(); } catch(err){ return jsonResponse({ error:'Ogiltig förfrågan.' }, 400); }
+  if(!checkAdminAuth(body, env)) return jsonResponse({ error:'Fel användarnamn eller lösenord.' }, 401);
+  if(!body.data || typeof body.data !== 'object') return jsonResponse({ error:'Ogiltig data.' }, 400);
+
+  const token = env.GITHUB_TOKEN;
+  try{
+    const sha = await githubPutJson('posts.json', body.data, body.sha || null, body.message || 'Uppdatera inlägg', token);
+    return jsonResponse({ sha:sha });
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
+}
+
+async function handleAdminUploadImage(request, env){
+  let body;
+  try{ body = await request.json(); } catch(err){ return jsonResponse({ error:'Ogiltig förfrågan.' }, 400); }
+  if(!checkAdminAuth(body, env)) return jsonResponse({ error:'Fel användarnamn eller lösenord.' }, 401);
+
+  const path = String(body.path || '').trim();
+  const content = String(body.content || '');
+  if(!path || !content) return jsonResponse({ error:'Bild eller sökväg saknas.' }, 400);
+
+  const token = env.GITHUB_TOKEN;
+  try{
+    await githubPutFile(path, content, 'Ladda upp bild: ' + path, token);
+    return jsonResponse({ ok:true });
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
 }
 
 export default {
@@ -138,57 +281,11 @@ export default {
       return jsonResponse({ error: 'Method not allowed' }, 405);
     }
 
-    let body;
-    try{
-      body = await request.json();
-    } catch(err){
-      return jsonResponse({ error: 'Ogiltig förfrågan.' }, 400);
-    }
+    const path = new URL(request.url).pathname;
 
-    const postId = String(body.postId || '').trim();
-    const password = String(body.password || '');
-    const name = String(body.name || '').trim().slice(0, MAX_NAME_LEN);
-    const text = String(body.text || '').trim().slice(0, MAX_TEXT_LEN);
-
-    if(!postId || !password || !name || !text){
-      return jsonResponse({ error: 'Fyll i namn och kommentar.' }, 400);
-    }
-
-    const token = env.GITHUB_TOKEN;
-
-    try{
-      const { data: posts } = await githubGetJson('posts.json', token);
-      if(!posts || !posts.commentAuth){
-        return jsonResponse({ error: 'Kommentarer är inte aktiverade än. Logga in på adminsidan en gång för att aktivera dem.' }, 400);
-      }
-
-      const key = await deriveKey(password, posts.commentAuth.salt);
-      let check;
-      try{
-        check = await decryptText(key, posts.commentAuth.check);
-      } catch(err){
-        return jsonResponse({ error: 'Fel lösenord.' }, 401);
-      }
-      if(check !== CHECK_PLAINTEXT){
-        return jsonResponse({ error: 'Fel lösenord.' }, 401);
-      }
-
-      const { data: existing, sha } = await githubGetJson('comments.json', token);
-      const comments = Array.isArray(existing) ? existing : [];
-
-      comments.push({
-        id: 'c_' + Date.now(),
-        postId: postId,
-        date: new Date().toISOString(),
-        name: await encryptText(key, name),
-        text: await encryptText(key, text)
-      });
-
-      await githubPutJson('comments.json', comments, sha, 'Ny kommentar', token);
-
-      return jsonResponse({ ok:true });
-    } catch(err){
-      return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
-    }
+    if(path === '/admin/posts') return handleAdminGetPosts(request, env);
+    if(path === '/admin/save') return handleAdminSave(request, env);
+    if(path === '/admin/upload-image') return handleAdminUploadImage(request, env);
+    return handleComment(request, env);
   }
 };
