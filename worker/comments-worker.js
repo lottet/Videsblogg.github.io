@@ -17,11 +17,14 @@
  *    encrypted with. commentAuth is created by admin/index.html the first
  *    time it's unlocked after this feature was added.
  *
- * 2. POST /admin/posts, /admin/save, /admin/upload-image — the admin panel
- *    logs in with a username/password checked against this Worker's own
- *    ADMIN_USERNAME/ADMIN_PASSWORD secrets, then every publish/delete/
- *    image-upload/tagline-save goes through here instead of the browser
- *    calling GitHub directly. admin/index.html never holds a GitHub token.
+ * 2. POST /admin/posts, /admin/save, /admin/upload-image, /admin/delete-post
+ *    — the admin panel logs in with a username/password checked against
+ *    this Worker's own ADMIN_USERNAME/ADMIN_PASSWORD secrets, then every
+ *    publish/delete/image-upload/tagline-save goes through here instead
+ *    of the browser calling GitHub directly. admin/index.html never holds
+ *    a GitHub token. /admin/delete-post cascades: removes the post,
+ *    drops any comments referencing it, and deletes its image files —
+ *    instead of just unlinking the post and leaving orphans behind.
  *
  * 3. GET /posts, GET /comments — index.html reads posts.json/comments.json
  *    through here instead of fetching the static files GitHub Pages
@@ -162,6 +165,34 @@ async function githubPutFile(path, base64Content, message, token){
   }
 }
 
+async function githubDeleteFile(path, message, token){
+  const url = 'https://api.github.com/repos/' + GITHUB_OWNER + '/' + GITHUB_REPO + '/contents/' + path;
+  const getRes = await fetch(url + '?ref=' + GITHUB_BRANCH, {
+    headers: {
+      'Authorization': 'token ' + token,
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'vides-blogg-comments-worker'
+    }
+  });
+  if(getRes.status === 404) return;
+  if(!getRes.ok) throw new Error('Kunde inte hitta ' + path + ' (' + getRes.status + ')');
+  const info = await getRes.json();
+  const delRes = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'token ' + token,
+      'Accept': 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'vides-blogg-comments-worker'
+    },
+    body: JSON.stringify({ message:message, sha:info.sha, branch:GITHUB_BRANCH })
+  });
+  if(!delRes.ok){
+    const err = await delRes.json().catch(function(){ return {}; });
+    throw new Error(err.message || ('Kunde inte ta bort ' + path + ' (' + delRes.status + ')'));
+  }
+}
+
 /* ---------- Comment submission ---------- */
 async function handleComment(request, env){
   let body;
@@ -263,6 +294,46 @@ async function handleAdminSave(request, env){
   }
 }
 
+/* Deleting a post used to just drop it from posts.json, leaving its
+   comments (orphaned by postId) and uploaded images stranded in the repo
+   forever. This does all three in one call: remove the post, drop any
+   comments referencing it, delete its image files. */
+async function handleAdminDeletePost(request, env){
+  let body;
+  try{ body = await request.json(); } catch(err){ return jsonResponse({ error:'Ogiltig förfrågan.' }, 400); }
+  if(!checkAdminAuth(body, env)) return jsonResponse({ error:'Fel användarnamn eller lösenord.' }, 401);
+
+  const postId = String(body.postId || '').trim();
+  if(!postId) return jsonResponse({ error:'Inlägg saknas.' }, 400);
+  const imagePaths = Array.isArray(body.imagePaths) ? body.imagePaths : [];
+
+  const token = env.GITHUB_TOKEN;
+  try{
+    const { data: posts, sha: postsSha } = await githubGetJson('posts.json', token);
+    if(!posts) return jsonResponse({ error:'Hittade inte posts.json.' }, 404);
+    const nextPosts = Object.assign({}, posts, {
+      posts: posts.posts.filter(function(p){ return p.id !== postId; })
+    });
+    const newSha = await githubPutJson('posts.json', nextPosts, postsSha, 'Ta bort inlägg: ' + postId, token);
+
+    const { data: comments, sha: commentsSha } = await githubGetJson('comments.json', token);
+    if(Array.isArray(comments)){
+      const remaining = comments.filter(function(c){ return c.postId !== postId; });
+      if(remaining.length !== comments.length){
+        await githubPutJson('comments.json', remaining, commentsSha, 'Ta bort kommentarer för borttaget inlägg', token);
+      }
+    }
+
+    for(const path of imagePaths){
+      await githubDeleteFile(path, 'Ta bort bild: ' + path, token);
+    }
+
+    return jsonResponse({ sha:newSha });
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
+}
+
 async function handleAdminUploadImage(request, env){
   let body;
   try{ body = await request.json(); } catch(err){ return jsonResponse({ error:'Ogiltig förfrågan.' }, 400); }
@@ -321,6 +392,7 @@ export default {
     if(path === '/admin/posts') return handleAdminGetPosts(request, env);
     if(path === '/admin/save') return handleAdminSave(request, env);
     if(path === '/admin/upload-image') return handleAdminUploadImage(request, env);
+    if(path === '/admin/delete-post') return handleAdminDeletePost(request, env);
     return handleComment(request, env);
   }
 };

@@ -684,10 +684,15 @@ postsManage.addEventListener('click', async function(e){
     if(!confirm('Ta bort inlägget "' + post.title + '"?')) return;
     btn.disabled = true;
     try{
-      const rawPosts = cachedRaw.posts.filter(function(p){ return p.id !== id; });
-      const nextRaw = Object.assign({}, cachedRaw, { posts:rawPosts });
-      cachedSha = await ghSaveRaw(nextRaw, cachedSha, 'Ta bort inlägg: ' + post.title);
-      cachedRaw = nextRaw;
+      const { res, result } = await workerPost('admin/delete-post', {
+        username: adminUsername,
+        password: adminPassword,
+        postId: id,
+        imagePaths: post.images || []
+      });
+      if(!res.ok) throw new Error(result.error || ('Kunde inte ta bort (' + res.status + ')'));
+      cachedSha = result.sha;
+      cachedRaw = Object.assign({}, cachedRaw, { posts: cachedRaw.posts.filter(function(p){ return p.id !== id; }) });
       cachedPosts = cachedPosts.filter(function(p){ return p.id !== id; });
       renderManageList();
     } catch(err){
