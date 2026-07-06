@@ -8,14 +8,19 @@
  * Two jobs, both proxying the GitHub Contents API with a token that only
  * ever lives as a Worker secret:
  *
- * 1. POST / (or /comment) — a reader submits a comment. Verified against
- *    posts.json's separate `commentAuth` field (its own salt + check
- *    value), not the main `salt`/`check` used for post content. Cloudflare
- *    Workers cap PBKDF2 at 100,000 iterations, while the main site uses
- *    150,000 (fine in real browsers) — reusing the main check here would
- *    either fail outright or derive a different key than posts were
- *    encrypted with. commentAuth is created by admin/index.html the first
- *    time it's unlocked after this feature was added.
+ * 1. POST / (or /comment) — a reader submits a comment, optionally with a
+ *    `parentId` to reply to an existing comment (threaded, arbitrary
+ *    depth — index.html renders it as nested replies). A parentId is
+ *    only kept if it actually matches an existing comment on the same
+ *    post; otherwise it's silently dropped to a top-level comment rather
+ *    than rejected. Verified against posts.json's separate `commentAuth`
+ *    field (its own salt + check value), not the main `salt`/`check` used
+ *    for post content. Cloudflare Workers cap PBKDF2 at 100,000
+ *    iterations, while the main site uses 150,000 (fine in real
+ *    browsers) — reusing the main check here would either fail outright
+ *    or derive a different key than posts were encrypted with.
+ *    commentAuth is created by admin/index.html the first time it's
+ *    unlocked after this feature was added.
  *
  * 2. POST /admin/posts, /admin/save, /admin/upload-image, /admin/delete-post
  *    — the admin panel logs in with a username/password checked against
@@ -203,6 +208,7 @@ async function handleComment(request, env){
   }
 
   const postId = String(body.postId || '').trim();
+  const parentId = body.parentId ? String(body.parentId).trim() : null;
   const password = String(body.password || '');
   const name = String(body.name || '').trim().slice(0, MAX_NAME_LEN);
   const text = String(body.text || '').trim().slice(0, MAX_TEXT_LEN);
@@ -233,9 +239,12 @@ async function handleComment(request, env){
     const { data: existing, sha } = await githubGetJson('comments.json', token);
     const comments = Array.isArray(existing) ? existing : [];
 
+    const validParent = parentId && comments.some(function(c){ return c.id === parentId && c.postId === postId; });
+
     comments.push({
       id: 'c_' + Date.now(),
       postId: postId,
+      parentId: validParent ? parentId : null,
       date: new Date().toISOString(),
       name: await encryptText(key, name),
       text: await encryptText(key, text)

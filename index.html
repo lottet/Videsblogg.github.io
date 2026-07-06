@@ -283,6 +283,18 @@
   .comment-submit:disabled{ opacity:0.6; cursor:default; }
   .comment-status{ font-size:12px; margin:6px 0 0; min-height:16px; }
   .comment-status.error{ color:var(--coral-dark); }
+  .comment-reply-toggle{
+    background:none; border:none; cursor:pointer; padding:0; margin-top:8px;
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:600; color:var(--violet-dark);
+  }
+  .comment-reply-toggle:hover{ text-decoration:underline; }
+  .comment-children{
+    margin-top:12px;
+    padding-left:14px;
+    border-left:2px solid #E4D8C0;
+    display:flex; flex-direction:column; gap:12px;
+  }
+  .reply-form{ margin-top:10px; }
 
   /* Lightbox */
   #lightbox{
@@ -527,7 +539,7 @@ async function loadComments(){
       try{
         const name = await decryptText(commentsKey, c.name);
         const text = await decryptText(commentsKey, c.text);
-        decrypted.push({ id:c.id, postId:c.postId, date:c.date, name:name, text:text });
+        decrypted.push({ id:c.id, postId:c.postId, parentId:c.parentId || null, date:c.date, name:name, text:text });
       } catch(err){
         /* skip a comment that fails to decrypt rather than break the page */
       }
@@ -646,38 +658,87 @@ function renderPosts(){
   });
 }
 
+function buildCommentTree(postId){
+  const postComments = allComments.filter(function(c){ return c.postId === postId; });
+  const byId = {};
+  postComments.forEach(function(c){ byId[c.id] = Object.assign({}, c, { children:[] }); });
+  const roots = [];
+  postComments.forEach(function(c){
+    const node = byId[c.id];
+    if(c.parentId && byId[c.parentId]){
+      byId[c.parentId].children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+  function sortTree(nodes){
+    nodes.sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+    nodes.forEach(function(n){ sortTree(n.children); });
+  }
+  sortTree(roots);
+  return roots;
+}
+
+function countComments(nodes){
+  return nodes.reduce(function(sum, n){ return sum + 1 + countComments(n.children); }, 0);
+}
+
+function renderCommentForm(postId, parentId){
+  return (
+    '<form class="comment-form' + (parentId ? ' reply-form' : '') + '"' +
+      ' data-post-id="' + escapeHtml(postId) + '"' +
+      (parentId ? ' data-parent-id="' + escapeHtml(parentId) + '" style="display:none;"' : '') + '>' +
+      '<input type="text" class="comment-name-input" placeholder="Namn" maxlength="100" required>' +
+      '<textarea class="comment-text-input" placeholder="' + (parentId ? 'Skriv ett svar...' : 'Skriv en kommentar...') + '" maxlength="2000" required></textarea>' +
+      '<div class="comment-form-actions">' +
+        '<button type="submit" class="comment-submit">Skicka</button>' +
+      '</div>' +
+      '<p class="comment-status"></p>' +
+    '</form>'
+  );
+}
+
+function renderCommentNode(node){
+  let html = '<div class="comment-item">' +
+    '<div class="comment-meta"><span class="comment-name">' + escapeHtml(node.name) + '</span> · <span class="meta">' + formatDate(node.date) + '</span></div>' +
+    '<div class="comment-text">' + escapeHtml(node.text) + '</div>' +
+    '<button type="button" class="comment-reply-toggle" data-comment-id="' + escapeHtml(node.id) + '">Svara</button>' +
+    renderCommentForm(node.postId, node.id);
+  if(node.children.length){
+    html += '<div class="comment-children">' + node.children.map(renderCommentNode).join('') + '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
 function renderComments(postId){
-  const postComments = allComments
-    .filter(function(c){ return c.postId === postId; })
-    .sort(function(a,b){ return new Date(a.date) - new Date(b.date); });
+  const tree = buildCommentTree(postId);
+  const total = countComments(tree);
 
   let listHtml = '';
-  if(postComments.length){
-    listHtml = '<div class="comment-list">' + postComments.map(function(c){
-      return '<div class="comment-item">' +
-        '<div class="comment-meta"><span class="comment-name">' + escapeHtml(c.name) + '</span> · <span class="meta">' + formatDate(c.date) + '</span></div>' +
-        '<div class="comment-text">' + escapeHtml(c.text) + '</div>' +
-      '</div>';
-    }).join('') + '</div>';
+  if(tree.length){
+    listHtml = '<div class="comment-list">' + tree.map(renderCommentNode).join('') + '</div>';
   }
 
-  const heading = 'Kommentarer' + (postComments.length ? ' (' + postComments.length + ')' : '');
+  const heading = 'Kommentarer' + (total ? ' (' + total + ')' : '');
 
   return (
     '<div class="comments">' +
       '<h3 class="comments-heading">' + heading + '</h3>' +
       listHtml +
-      '<form class="comment-form" data-post-id="' + escapeHtml(postId) + '">' +
-        '<input type="text" class="comment-name-input" placeholder="Namn" maxlength="100" required>' +
-        '<textarea class="comment-text-input" placeholder="Skriv en kommentar..." maxlength="2000" required></textarea>' +
-        '<div class="comment-form-actions">' +
-          '<button type="submit" class="comment-submit">Skicka</button>' +
-        '</div>' +
-        '<p class="comment-status"></p>' +
-      '</form>' +
+      renderCommentForm(postId, null) +
     '</div>'
   );
 }
+
+postsListEl.addEventListener('click', function(e){
+  const toggle = e.target.closest('.comment-reply-toggle');
+  if(!toggle) return;
+  const form = toggle.nextElementSibling;
+  if(form && form.classList.contains('reply-form')){
+    form.style.display = form.style.display === 'none' ? 'flex' : 'none';
+  }
+});
 
 postsListEl.addEventListener('submit', async function(e){
   const form = e.target.closest('.comment-form');
@@ -685,6 +746,7 @@ postsListEl.addEventListener('submit', async function(e){
   e.preventDefault();
 
   const postId = form.dataset.postId;
+  const parentId = form.dataset.parentId || null;
   const nameInput = form.querySelector('.comment-name-input');
   const textInput = form.querySelector('.comment-text-input');
   const statusEl = form.querySelector('.comment-status');
@@ -702,7 +764,7 @@ postsListEl.addEventListener('submit', async function(e){
     const res = await fetch(WORKER_URL + 'comment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId:postId, password:sitePassword, name:name, text:text })
+      body: JSON.stringify({ postId:postId, parentId:parentId, password:sitePassword, name:name, text:text })
     });
     const result = await res.json().catch(function(){ return {}; });
     if(!res.ok || result.error){
@@ -714,7 +776,7 @@ postsListEl.addEventListener('submit', async function(e){
        rebuild after a commit. Show it locally right away instead; other
        visitors (and this browser, on next reload) pick it up once the
        rebuild catches up. */
-    allComments.push({ id:'local_' + Date.now(), postId:postId, date:new Date().toISOString(), name:name, text:text });
+    allComments.push({ id:'local_' + Date.now(), postId:postId, parentId:parentId, date:new Date().toISOString(), name:name, text:text });
     renderPosts();
   } catch(err){
     statusEl.textContent = err.message;
