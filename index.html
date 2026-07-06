@@ -367,8 +367,10 @@ const PBKDF2_ITERATIONS = 150000;
 const COMMENTS_PBKDF2_ITERATIONS = 100000;
 const CHECK_PLAINTEXT = 'lov-och-black-ok';
 const DEFAULT_TAGLINE = 'en samling anteckningar, tankar och resor';
-/* Replace with the URL of your deployed Cloudflare Worker (see worker/comments-worker.js) */
-const COMMENTS_WORKER_URL = 'https://my-worker.sam-metsi.workers.dev/';
+/* The Worker also serves posts.json/comments.json live (see
+   worker/comments-worker.js) so this page never has to wait on a GitHub
+   Pages rebuild to see new posts or comments. */
+const WORKER_URL = 'https://my-worker.sam-metsi.workers.dev/';
 
 function b64ToBuf(b64){
   const bin = atob(b64);
@@ -417,13 +419,11 @@ let sitePassword = null;
 let allComments = [];
 
 async function attemptUnlock(password){
-  let data = null;
-  const res = await fetch('./posts.json', {cache:'no-store'});
-  if(res.ok){
-    data = await res.json();
-  } else if(res.status !== 404){
+  const res = await fetch(WORKER_URL + 'posts', {cache:'no-store'});
+  if(!res.ok){
     throw new Error('Kunde inte hämta inlägg (' + res.status + ').');
   }
+  const data = await res.json();
 
   if(!data || !data.salt){
     cryptoKey = null;
@@ -514,7 +514,7 @@ async function loadPosts(){
 async function loadComments(){
   let list = [];
   try{
-    const res = await fetch('./comments.json', {cache:'no-store'});
+    const res = await fetch(WORKER_URL + 'comments', {cache:'no-store'});
     if(res.ok) list = await res.json();
   } catch(err){
     list = [];
@@ -699,7 +699,7 @@ postsListEl.addEventListener('submit', async function(e){
   statusEl.className = 'comment-status';
 
   try{
-    const res = await fetch(COMMENTS_WORKER_URL, {
+    const res = await fetch(WORKER_URL + 'comment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ postId:postId, password:sitePassword, name:name, text:text })

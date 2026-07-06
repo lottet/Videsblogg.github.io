@@ -4,7 +4,11 @@ This Worker has two jobs, both proxying the GitHub Contents API with a
 token that only ever lives as a server-side secret — the browser never
 holds one:
 
-1. Lets `index.html` accept new comments without any GitHub access.
+1. Lets `index.html` accept new comments without any GitHub access, and
+   read `posts.json`/`comments.json` live from GitHub's API instead of
+   the static files GitHub Pages serves — so new posts and comments show
+   up immediately instead of waiting on a Pages rebuild (which can lag
+   behind a commit by anywhere from seconds to a couple of minutes).
 2. Lets `admin/index.html` publish/edit/delete posts, upload images, and
    save the tagline — all authenticated with a plain username/password
    instead of a GitHub personal access token pasted into the browser.
@@ -41,7 +45,7 @@ Save each — this may trigger a redeploy, which is fine.
 
 ## 3. Get the Worker's URL and wire it in
 
-Both `index.html` (`COMMENTS_WORKER_URL`) and `admin/index.html` (`ADMIN_WORKER_URL`) need the same Worker's URL, shown on the Worker's main dashboard page (e.g. `https://vides-blogg-comments.yourname.workers.dev/`). If you're setting this Worker up fresh, send me the URL and I'll wire both in.
+Both `index.html` (`WORKER_URL`) and `admin/index.html` (`ADMIN_WORKER_URL`) need the same Worker's URL, shown on the Worker's main dashboard page (e.g. `https://vides-blogg-comments.yourname.workers.dev/`). If you're setting this Worker up fresh, send me the URL and I'll wire both in.
 
 ## Notes
 
@@ -49,3 +53,4 @@ Both `index.html` (`COMMENTS_WORKER_URL`) and `admin/index.html` (`ADMIN_WORKER_
 - `GITHUB_OWNER`, `GITHUB_REPO`, and `GITHUB_BRANCH` are hardcoded at the top of the script rather than made into variables, since they're not secret and specific to this one blog.
 - The free Cloudflare Workers plan (100,000 requests/day) is far more than a personal blog will ever use — expect $0 cost.
 - `admin/index.html` no longer has any settings UI at all — no repo/branch/token fields, just the username/password login. If you ever need to change the GitHub token, repo, or branch, that now happens by updating the Worker's secrets/code, not the admin page.
+- Reading posts/comments now goes through GitHub's API (rate-limited, 5,000 requests/hour with a token) instead of GitHub Pages' unlimited static CDN. Fine for a personal blog's traffic; would need rethinking if this ever got heavy, unrelated traffic.

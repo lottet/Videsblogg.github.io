@@ -22,6 +22,15 @@
  *    ADMIN_USERNAME/ADMIN_PASSWORD secrets, then every publish/delete/
  *    image-upload/tagline-save goes through here instead of the browser
  *    calling GitHub directly. admin/index.html never holds a GitHub token.
+ *
+ * 3. GET /posts, GET /comments — index.html reads posts.json/comments.json
+ *    through here instead of fetching the static files GitHub Pages
+ *    serves. The Contents API always reflects the latest commit
+ *    immediately; Pages' build-and-deploy step (which is what the static
+ *    fetch depends on) can lag behind by anywhere from seconds to a
+ *    couple of minutes. No auth needed — same trust model as the static
+ *    files: publicly fetchable, private only because the content itself
+ *    is encrypted.
  */
 
 const GITHUB_OWNER = 'lottet';
@@ -37,7 +46,7 @@ const MAX_TEXT_LEN = 2000;
 function corsHeaders(){
   return {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
   };
 }
@@ -272,16 +281,42 @@ async function handleAdminUploadImage(request, env){
   }
 }
 
+/* ---------- Public reads (bypass GitHub Pages' build lag) ---------- */
+async function handlePublicGetPosts(env){
+  try{
+    const { data } = await githubGetJson('posts.json', env.GITHUB_TOKEN);
+    return jsonResponse(data);
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
+}
+
+async function handlePublicGetComments(env){
+  try{
+    const { data } = await githubGetJson('comments.json', env.GITHUB_TOKEN);
+    return jsonResponse(Array.isArray(data) ? data : []);
+  } catch(err){
+    return jsonResponse({ error: err.message || 'Något gick fel.' }, 500);
+  }
+}
+
 export default {
   async fetch(request, env){
     if(request.method === 'OPTIONS'){
       return new Response(null, { headers: corsHeaders() });
     }
+
+    const path = new URL(request.url).pathname;
+
+    if(request.method === 'GET'){
+      if(path === '/posts') return handlePublicGetPosts(env);
+      if(path === '/comments') return handlePublicGetComments(env);
+      return jsonResponse({ error: 'Not found' }, 404);
+    }
+
     if(request.method !== 'POST'){
       return jsonResponse({ error: 'Method not allowed' }, 405);
     }
-
-    const path = new URL(request.url).pathname;
 
     if(path === '/admin/posts') return handleAdminGetPosts(request, env);
     if(path === '/admin/save') return handleAdminSave(request, env);
